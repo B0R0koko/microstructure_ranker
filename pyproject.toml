@@ -1,0 +1,19 @@
+[tool.poetry]
+name = "microstructure-price-prediction"
+version = "0.1.0"
+description = ""
+authors = ["Mikhail Mironov, Maxim Shibanov"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+scrapy = "^2.11.2"
+pandas = "^2.2.3"
+polars = "^1.9.0"
+numpy = "^2.1.1"
+requests = "^2.32.3"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
