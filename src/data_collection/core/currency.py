@@ -3,8 +3,8 @@ from dataclasses import dataclass
 
 @dataclass
 class CurrencyPair:
-    BASE: str
-    TERM: str
+    base: str
+    term: str
 
     def __str__(self) -> str:
-        return f"{self.BASE}{self.TERM}"
+        return f"{self.base}{self.term}"
