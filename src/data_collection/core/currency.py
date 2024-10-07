@@ -8,3 +8,7 @@ class CurrencyPair:
 
     def __str__(self) -> str:
         return f"{self.base}{self.term}"
+
+    @property
+    def name(self) -> str:
+        return f"{self.base}{self.term}"
