@@ -1,3 +1,5 @@
+# pylint: disable=use-dict-literal
+
 import re
 from pathlib import Path
 from typing import List, Dict, Optional, Any
@@ -76,7 +78,7 @@ class TradesCrawler(scrapy.Spider):
         # if len is 500, then we need to send another request with marker param which is the last entry in hrefs
         if len(hrefs) == 500:
             yield scrapy.Request(
-                url=get_currency_url(currency_pair=currency_pair, marker=hrefs[-1]),
+                url=get_currency_url(currency_pair=currency_pair, collect_mode=self.collect_mode, marker=hrefs[-1]),
                 callback=self.parse_currency_pair,  # call itself one more time
                 meta={"currency_pair": currency_pair, "href_container": href_container},
             )

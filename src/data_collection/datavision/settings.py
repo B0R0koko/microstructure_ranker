@@ -1,3 +1,5 @@
+# pylint: disable=line-too-long
+
 GB = 8 * 1024 * 1024 * 1024
 
 SETTINGS = dict(
