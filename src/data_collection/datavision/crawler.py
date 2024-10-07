@@ -1,4 +1,3 @@
-import os
 import re
 from pathlib import Path
 from typing import List, Dict, Optional, Any
@@ -11,7 +10,7 @@ from scrapy.http.response import Response
 
 from data_collection.core.collect_mode import CollectMode
 from data_collection.core.currency import CurrencyPair
-from data_collection.datavision.settings import USER_AGENT, ITEM_PIPELINES
+from data_collection.datavision.settings import SETTINGS
 
 BINANCE_S3: str = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
 BINANCE_DATAVISION: str = "https://data.binance.vision"
@@ -101,21 +100,15 @@ class TradesCrawler(scrapy.Spider):
 
 
 if __name__ == "__main__":
-    ROOT_DIR: Path = Path(os.path.dirname(os.path.abspath(__file__)))
-    data_dir: Path = ROOT_DIR.joinpath("data")
-
-    print(data_dir)
+    data_dir: Path = Path("D:/data")
 
     process: CrawlerProcess = CrawlerProcess(
-        settings=dict(
-            USER_AGENT=USER_AGENT,
-            ITEM_PIPELINES=ITEM_PIPELINES
-        )
+        settings=SETTINGS
     )
 
     process.crawl(
         TradesCrawler,
-        currency_pairs=[CurrencyPair("BTC", "USDT")],
+        currency_pairs=[CurrencyPair("ADA", "USDT")],
         collect_mode=CollectMode.MONTHLY,
         output_dir=data_dir
     )
