@@ -47,7 +47,8 @@ class TradesCrawler(scrapy.Spider):
     name = "ticker_crawler"
 
     def __init__(
-            self, currency_pairs: List[CurrencyPair], collect_mode: CollectMode, output_dir: Path, *args, **kwargs):
+            self, currency_pairs: List[CurrencyPair], collect_mode: CollectMode, output_dir: Path, *args, **kwargs
+    ):
         super().__init__(*args, **kwargs)
         self.currency_pairs: List[CurrencyPair] = currency_pairs
         self.collect_mode: CollectMode = collect_mode
