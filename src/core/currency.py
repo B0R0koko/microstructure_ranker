@@ -5,6 +5,12 @@ import requests
 
 
 @dataclass
+class Currency:
+    base: str
+    term: str
+
+
+@dataclass
 class CurrencyPair:
     base: str
     term: str

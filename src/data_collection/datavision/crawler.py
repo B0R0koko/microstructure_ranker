@@ -10,8 +10,8 @@ from scrapy.crawler import CrawlerProcess
 from scrapy.http import Request
 from scrapy.http.response import Response
 
-from data_collection.core.collect_mode import CollectMode
-from data_collection.core.currency import CurrencyPair
+from core.collect_mode import CollectMode
+from core.currency import CurrencyPair
 from data_collection.datavision.settings import SETTINGS
 
 BINANCE_S3: str = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
