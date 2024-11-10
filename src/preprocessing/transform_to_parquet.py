@@ -1,11 +1,10 @@
 import os
-import tempfile
 import zipfile
 from pathlib import Path
 from typing import Optional, Sequence
 
 import polars as pl
-from polars.io.csv import BatchedCsvReader
+from pyarrow import RecordBatch, csv
 
 from core.columns import *
 from core.currency import CurrencyPair
@@ -13,78 +12,51 @@ from core.currency import CurrencyPair
 _BINANCE_LEAVE_COLS: List[str] = [PRICE, QUANTITY, TRADE_TIME, IS_BUYER_MAKER]
 
 
-def preprocess_csv_file_in_batches(
+def save_to_pyarrow_hive(
         csv_file_path: Path,
         output_dir: Path,
-        file_name_to_ext: str,
-        new_columns: Optional[Sequence[str]] = None,
-        leave_cols: Optional[Sequence[str]] = None,
-        batch_rows_loaded: int = int(1e6)
+        new_columns: List[str],
+        leave_cols: Optional[Sequence[str]],
+        currency_pair: CurrencyPair
 ) -> None:
     """
-    Reads csv file using polars with batch read enabled, such that it is not loaded in one go to the memory
+    Preprocess and partition data by date using PyArrow hive partitioning, optimized for large datasets.
+    Specify partition to be able to query parquet files using pl.scan_parquet with filter queries
     """
-    reader: BatchedCsvReader = pl.read_csv_batched(
-        source=csv_file_path,
-        has_header=False,
-        new_columns=new_columns,
-        low_memory=True,
-        batch_size=batch_rows_loaded,
+    # Define CSV read options
+    MB: int = 1024 ** 2
+
+    read_options: csv.ReadOptions = csv.ReadOptions(
+        column_names=new_columns,
+        block_size=MB * 32,  # batch_size in megabytes
+        use_threads=True
     )
+    # subset leave_cols from new_columns
+    convert_options: csv.ConvertOptions = csv.ConvertOptions(include_columns=leave_cols)
 
-    os.makedirs(output_dir, exist_ok=True)
-    file_path: Path = output_dir.joinpath(f"{file_name_to_ext}.parquet")
+    # Use a context manager to ensure the CSV reader is closed
+    with csv.open_csv(csv_file_path, read_options=read_options, convert_options=convert_options) as csv_reader:
+        batch: RecordBatch
 
-    batch: List[pl.DataFrame] | None
-    # Stop when chunk is None
-    while (batch := reader.next_batches(1)) is not None:
-        df: pl.DataFrame = batch[0]
-        # Append to parquet file each batched df with selected leave_cols
-        df.select(leave_cols).to_pandas().to_parquet(
-            file_path,
-            compression="gzip",
-            engine="fastparquet",
-            append=os.path.exists(file_path),
-            index=False
-        )
-
-
-def preprocess_csv_file_partitioned_by_trade_time(
-        csv_file_path: Path,
-        hive_dir: Path,
-        currency_pair: CurrencyPair,
-        new_columns: Optional[Sequence[str]] = None,
-        leave_cols: Optional[Sequence[str]] = None,
-) -> None:
-    """Partition loaded data from csv file into chunks of size one day using pyarrow backend"""
-
-    df: pl.LazyFrame = pl.scan_csv(source=csv_file_path, new_columns=new_columns)
-    # Cast TRADE_TIME column to datetime and then extract date into a separate column
-    df = df.select(leave_cols)
-    df = df.with_columns(
-        pl.lit(currency_pair.name).alias(SYMBOL),
-        pl.col(TRADE_TIME).cast(pl.Datetime(time_unit="ms")).alias(TRADE_TIME)
-    )
-    df = df.with_columns(pl.col(TRADE_TIME).dt.date().alias(f"{TRADE_TIME}_date"))
-
-    # Collect dataframe in batches and dump them into parquet hive
-    slice_offset: int = 0
-    step: int = int(1e6)
-
-    while True:
-        df_sliced: pl.DataFrame = df.slice(offset=slice_offset, length=step).collect()
-
-        if df_sliced.is_empty():
-            break
-
-        df_sliced.write_parquet(
-            hive_dir,
-            use_pyarrow=True,
-            pyarrow_options={
-                "partition_cols": [SYMBOL, f"{TRADE_TIME}_date"],
-            }
-        )
-        slice_offset += step
+        for batch in csv_reader:
+            df: pl.DataFrame = pl.from_arrow(data=batch)
+            # Attach SYMBOL columns as well as cast TRADE_TIME from milliseconds Timestamp to datetime
+            df = df.with_columns(
+                pl.lit(currency_pair.name).alias(SYMBOL),
+                pl.col(TRADE_TIME).cast(pl.Datetime(time_unit="ms")).alias(TRADE_TIME)
+            )
+            # Create date column from TRADE_TIME
+            df = df.with_columns(pl.col(TRADE_TIME).dt.date().alias("date"))
+            # Write batch to parquet using pyarrow hive, this way we will be able to query necessary parquet files
+            # with sql like queries from the local filesystem
+            df.write_parquet(
+                output_dir,
+                use_pyarrow=True,
+                pyarrow_options={
+                    "partition_cols": ["date", SYMBOL],  # define set of filters here
+                    "existing_data_behavior": "overwrite_or_ignore",
+                }
+            )
 
 
 def check_if_zipped_file_is_csv(file_path: str) -> bool:
@@ -93,41 +65,61 @@ def check_if_zipped_file_is_csv(file_path: str) -> bool:
 
 
 class ParquetTransformer:
-    ZIPPED_DATA_DIR: Path = Path("D:/data/zipped_data")
-    PARQUET_DATA_DIR: Path = Path("D:/data/parquet_data")
 
-    def __init__(self):
-        ...
+    def __init__(self, zipped_data_dir: Path, temp_dir: Path, output_dir: Path):
+        self.zipped_data_dir: Path = zipped_data_dir
+        self.temp_dir: Path = temp_dir
+        self.output_dir: Path = output_dir
 
     def preprocess_zip_file(self, currency_pair: CurrencyPair, zip_file: str) -> None:
         zip_path: Path = (
-            self.ZIPPED_DATA_DIR
+            self.zipped_data_dir
             .joinpath(currency_pair.name)
             .joinpath(zip_file)
         )
         # unzip data stored in the zipped archive
-        with tempfile.TemporaryDirectory() as tmp_dir, zipfile.ZipFile(zip_path, mode="r") as zip_ref:
-            zipped_file: str = zip_ref.namelist()[0]  # name of csv file once zip file is unzipped
+        with zipfile.ZipFile(zip_path, mode="r") as zip_ref:
+            csv_file: str = zip_ref.namelist()[0]  # name of csv file once zip file is unzipped
 
-            if not check_if_zipped_file_is_csv(file_path=zipped_file):
+            if not check_if_zipped_file_is_csv(file_path=csv_file):
                 raise ValueError("Unzipped file is not a csv file")
 
-            zip_ref.extract(member=zipped_file, path=tmp_dir)
+            zip_ref.extract(member=csv_file, path=self.temp_dir)  # extract zipped csv file to self.temp_dir
+            csv_file_path: Path = self.temp_dir.joinpath(csv_file)
 
-            csv_file_path: Path = Path(tmp_dir).joinpath(zipped_file)
-
-            preprocess_csv_file_partitioned_by_trade_time(
+            save_to_pyarrow_hive(
                 csv_file_path=csv_file_path,
-                hive_dir=self.PARQUET_DATA_DIR,
-                currency_pair=currency_pair,
+                output_dir=self.output_dir,
                 new_columns=BINANCE_TRADE_COLS,
                 leave_cols=_BINANCE_LEAVE_COLS,
+                currency_pair=currency_pair
             )
+
+    def preprocess_zip_folder(self, currency_pair: CurrencyPair) -> None:
+        """
+        Data should be organized like this, then we will iterate over each CurrencyPair
+        D:/DATA/ZIPPED_DATA
+        ├───ADAUSDT
+        ├───BNBBTC
+        ├───BTCUSDT
+        ├───ETHBTC
+        ├───LTCBTC
+        └───NEOBTC
+        """
+        for folder in os.listdir(self.zipped_data_dir):
+            ...
 
 
 if __name__ == "__main__":
-    pair: CurrencyPair = CurrencyPair(base="BTC", term="USDT")
-    ParquetTransformer().preprocess_zip_file(
+    pair: CurrencyPair = CurrencyPair(base="ADA", term="USDT")
+
+    transformer: ParquetTransformer = ParquetTransformer(
+        zipped_data_dir=Path("D:/data/zipped_data"),
+        temp_dir=Path("D:/data/temp"),
+        output_dir=Path("D:/data/transformed_data"),
+    )
+
+    transformer.preprocess_zip_file(
         currency_pair=pair,
-        zip_file="BTCUSDT-trades-2024-09.zip"
+        zip_file="ADAUSDT-trades-2024-10.zip"
     )
