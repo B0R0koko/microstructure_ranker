@@ -29,6 +29,11 @@ class FeaturePipeline(ABC):
         return [CurrencyPair.from_string(symbol=symbol) for symbol in unique_symbols]
 
     def load_cross_section(self, start_time: datetime, end_time: datetime) -> pl.DataFrame:
+        """
+        This function runs self.compute_features_for_currency_pair for each of the currency_pair available within
+        a given range of time defined by passed in start_time and end_time. Returns pl.DataFrame with all features
+        attached
+        """
         currency_pairs: List[CurrencyPair] = self._get_currency_pairs_cross_section(
             start_time=start_time, end_time=end_time
         )
@@ -38,13 +43,19 @@ class FeaturePipeline(ABC):
 
         for currency_pair in pbar:
             pbar.set_description(desc=f"Computing features for {currency_pair.name}")
-            df_currency_pair: pl.DataFrame = self.compute_features_for_currency_pair(currency_pair=currency_pair)
+            df_currency_pair: pl.DataFrame = self.compute_features_for_currency_pair(
+                currency_pair=currency_pair,
+                start_time=start_time,
+                end_time=end_time
+            )
             dfs.append(df_currency_pair)
 
         return pl.concat(dfs)
 
     @abstractmethod
-    def compute_features_for_currency_pair(self, currency_pair: CurrencyPair) -> pl.DataFrame:
+    def compute_features_for_currency_pair(
+            self, currency_pair: CurrencyPair, start_time: datetime, end_time: datetime
+    ) -> pl.DataFrame:
         """
         Define logic of how we load data for a passed in currency_pair as well as how we compute features. This method
         must return pl.DataFrame with all compute features. Later this dataframe will be attached to df_cross_sections:
@@ -52,10 +63,14 @@ class FeaturePipeline(ABC):
         """
 
 
-if __name__ == "__main__":
+def _test_main() -> None:
     hive_dir: Path = Path("D:/data/transformed_data")
     start_date: datetime = datetime(2024, 9, 1)
     end_date: datetime = datetime(2024, 10, 1)
 
     pipeline: FeaturePipeline = FeaturePipeline(hive_dir=hive_dir)
     pipeline.load_cross_section(start_time=start_date, end_time=end_date)
+
+
+if __name__ == "__main__":
+    _test_main()
