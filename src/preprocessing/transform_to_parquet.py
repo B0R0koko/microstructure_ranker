@@ -71,6 +71,16 @@ class ParquetTransformer:
         self.temp_dir: Path = temp_dir
         self.output_dir: Path = output_dir
 
+        self.currency_pairs: List[CurrencyPair] = self._parse_collected_currency_pairs()
+
+    def _parse_collected_currency_pairs(self) -> List[CurrencyPair]:
+        """Folders are named in the following pattern: BASE-TERM"""
+        currency_pairs: List[CurrencyPair] = []
+        for folder in os.listdir(self.zipped_data_dir):
+            base, term = folder.split("-")
+            currency_pairs.append(CurrencyPair(base=base, term=term))
+        return currency_pairs
+
     def preprocess_zip_file(self, currency_pair: CurrencyPair, zip_file: str) -> None:
         zip_path: Path = (
             self.zipped_data_dir
@@ -95,31 +105,34 @@ class ParquetTransformer:
                 currency_pair=currency_pair
             )
 
-    def preprocess_zip_folder(self, currency_pair: CurrencyPair) -> None:
+    def preprocess_zip_folders(self) -> None:
         """
         Data should be organized like this, then we will iterate over each CurrencyPair
         D:/DATA/ZIPPED_DATA
-        ├───ADAUSDT
-        ├───BNBBTC
-        ├───BTCUSDT
-        ├───ETHBTC
-        ├───LTCBTC
-        └───NEOBTC
+        ├───ADA-USDT
+        ├───BNB-BTC
+        ├───BTC-USDT
+        ├───ETH-BTC
+        ├───LTC-BTC
+        └───NEO-BTC
         """
-        for folder in os.listdir(self.zipped_data_dir):
-            ...
+
+        for currency_pair in self.currency_pairs:
+            currency_pair: CurrencyPair
+            currency_pair_folder: Path = self.zipped_data_dir.joinpath(currency_pair.name)
+            # Iterate over each zip file store in currency_pair_folder
+            for file in os.listdir(currency_pair_folder):
+                self.preprocess_zip_file(
+                    currency_pair=currency_pair,
+                    zip_file=file
+                )
 
 
 if __name__ == "__main__":
-    pair: CurrencyPair = CurrencyPair(base="ADA", term="USDT")
-
     transformer: ParquetTransformer = ParquetTransformer(
         zipped_data_dir=Path("D:/data/zipped_data"),
         temp_dir=Path("D:/data/temp"),
         output_dir=Path("D:/data/transformed_data"),
     )
 
-    transformer.preprocess_zip_file(
-        currency_pair=pair,
-        zip_file="ADAUSDT-trades-2024-10.zip"
-    )
+    transformer.preprocess_zip_folders()

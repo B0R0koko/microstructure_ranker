@@ -27,7 +27,7 @@ def get_currency_url(
     params: Dict[str, str] = {
         "delimiter": "/",
         # data/spot/daily/trades/1INCHBUSD/
-        "prefix": f"data/spot/{collect_mode.lower()}/trades/{currency_pair.name}/",
+        "prefix": f"data/spot/{collect_mode.lower()}/trades/{currency_pair.binance_name}/",
     }
 
     if marker:

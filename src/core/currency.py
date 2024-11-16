@@ -16,10 +16,14 @@ class CurrencyPair:
     term: str
 
     def __str__(self) -> str:
-        return f"{self.base}{self.term}"
+        return f"{self.base}-{self.term}"
 
     @property
     def name(self) -> str:
+        return f"{self.base}-{self.term}"
+
+    @property
+    def binance_name(self) -> str:
         return f"{self.base}{self.term}"
 
 
