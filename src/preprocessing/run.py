@@ -10,12 +10,11 @@ def main():
     currency_pair: CurrencyPair = CurrencyPair(base="ADA", term="USDT")
 
     df = df.filter(
-        (pl.col("symbol") == currency_pair.name) &
         (pl.col("date") >= datetime(2024, 9, 20)) &
         (pl.col("date") < datetime(2024, 10, 20))
     )
 
-    print(df.collect())
+    print(df.select("symbol").unique().collect())
 
 
 if __name__ == "__main__":
