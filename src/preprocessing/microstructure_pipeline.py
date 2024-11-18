@@ -26,7 +26,10 @@ class MicrostructurePipeline(FeaturePipeline):
         )
         # Compute features using pl.LazyFrame, make sure to call .collect() on pl.LazyFrame at the very end
         # this way it is more efficient
-
+        df_currency_pair = df_currency_pair.with_columns(
+            (pl.col("price") * pl.col("quantity")).alias("quote")
+        )
+        # Implement feature computation
         return df_currency_pair.collect()
 
 
@@ -36,7 +39,8 @@ def _test_main():
     end_date: datetime = datetime(2024, 10, 1)
 
     pipeline: MicrostructurePipeline = MicrostructurePipeline(hive_dir=hive_dir)
-    pipeline.load_cross_section(start_time=start_date, end_time=end_date)
+    df_cross_section: pl.DataFrame = pipeline.load_cross_section(start_time=start_date, end_time=end_date)
+    print(df_cross_section)
 
 
 if __name__ == "__main__":

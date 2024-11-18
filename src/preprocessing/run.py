@@ -14,7 +14,7 @@ def main():
         (pl.col("date") < datetime(2024, 10, 20))
     )
 
-    print(df.select("symbol").unique().collect())
+    print(df.head().collect())
 
 
 if __name__ == "__main__":
