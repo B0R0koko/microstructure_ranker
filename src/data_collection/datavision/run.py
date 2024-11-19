@@ -15,7 +15,7 @@ def main():
 
     process.crawl(
         TradesCrawler,
-        currency_pairs=[CurrencyPair(base="AVAX", term="USDT")],
+        currency_pairs=[CurrencyPair(base="BTC", term="USDT")],
         collect_mode=CollectMode.MONTHLY,
         output_dir=data_dir
     )
