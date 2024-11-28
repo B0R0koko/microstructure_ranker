@@ -1,10 +1,13 @@
 from datetime import datetime
 from pathlib import Path
+from typing import Dict, Any
 
 import polars as pl
 
 from core.currency import CurrencyPair
 from core.feature_pipeline import FeaturePipeline
+from core.time_utils import Bounds
+from preprocessing.features.features_27_11 import compute_features
 
 
 class MicrostructurePipeline(FeaturePipeline):
@@ -15,31 +18,29 @@ class MicrostructurePipeline(FeaturePipeline):
             hive_dir=hive_dir
         )
 
-    def compute_features_for_currency_pair(
-            self, currency_pair: CurrencyPair, start_time: datetime, end_time: datetime
-    ) -> pl.DataFrame:
-        # get reference to the hive and then filter it by currency
-        df_hive: pl.LazyFrame = pl.scan_parquet(self.hive_dir)
-        df_currency_pair: pl.LazyFrame = df_hive.filter(
-            (pl.col("symbol") == currency_pair.name) &
-            (pl.col("date").is_between(lower_bound=start_time, upper_bound=end_time))
-        )
+    def compute_features_for_currency_pair(self, currency_pair: CurrencyPair, bounds: Bounds) -> Dict[str, Any]:
+        """
+        Load data using load_currency_pair_dataframe from parent class and then call compute_features function on it
+        which returns a mapping of feature names to their corresponding values
+        """
+        df_currency_pair: pl.LazyFrame = self.load_currency_pair_dataframe(currency_pair=currency_pair, bounds=bounds)
         # Compute features using pl.LazyFrame, make sure to call .collect() on pl.LazyFrame at the very end
         # this way it is more efficient
-        df_currency_pair = df_currency_pair.with_columns(
-            (pl.col("price") * pl.col("quantity")).alias("quote")
+        features: Dict[str, Any] = compute_features(
+            df_currency_pair=df_currency_pair, currency_pair=currency_pair, bounds=bounds
         )
-        # Implement feature computation
-        return df_currency_pair.collect()
+        return features
 
 
 def _test_main():
     hive_dir: Path = Path("D:/data/transformed_data")
-    start_date: datetime = datetime(2024, 9, 1)
-    end_date: datetime = datetime(2024, 10, 1)
+    start_time: datetime = datetime(2024, 9, 1, 10, 20, 1)
+    end_time: datetime = datetime(2024, 9, 18, 10, 23, 36)
+
+    bounds: Bounds = Bounds(start_time=start_time, end_time=end_time)
 
     pipeline: MicrostructurePipeline = MicrostructurePipeline(hive_dir=hive_dir)
-    df_cross_section: pl.DataFrame = pipeline.load_cross_section(start_time=start_date, end_time=end_date)
+    df_cross_section: pl.DataFrame = pipeline.load_cross_section(bounds=bounds)
     print(df_cross_section)
 
 
