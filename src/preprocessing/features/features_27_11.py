@@ -47,8 +47,25 @@ def compute_volume_imbalance(
 
     return {
         f"volume_imbalance_{offset.name}": (
-            df_trades.filter(pl.col("trade_time") >= bounds.end_time - offset.value)
+            df_trades
+            .filter(pl.col("trade_time") >= bounds.end_time - offset.value)
             .select(pl.col("quote_sign").sum() / pl.col("quote_abs").sum())
+            .collect()
+            .item()
+        )
+        for offset in time_offsets
+    }
+
+
+def compute_slippage_features(df_trades: pl.LazyFrame, bounds: Bounds, time_offsets: List[TimeOffset]) -> Dict[
+    str, float]:
+    """Compute slippage features based on quote_slippage_abs and quote_slippage_sign fields"""
+
+    return {
+        f"slippage_imbalance_{offset.name}": (
+            df_trades
+            .filter(pl.col("trade_time") >= bounds.end_time - offset.value)
+            .select(pl.col("quote_slippage_sign").sum() / pl.col("quote_slippage_abs").sum())
             .collect()
             .item()
         )
@@ -82,15 +99,20 @@ def compute_features(df_currency_pair: pl.LazyFrame, currency_pair: CurrencyPair
 
     log_interval_return: float = np.log(price_last / price_first)
 
+    desired_offsets: List[TimeOffset] = [
+        TimeOffset.FIVE_SECONDS, TimeOffset.TEN_SECONDS, TimeOffset.HALF_MINUTE, TimeOffset.MINUTE
+    ]
     volume_imbalance_features: Dict[str, float] = compute_volume_imbalance(
-        df_trades=df_trades,
-        bounds=bounds,
-        time_offsets=[TimeOffset.FIVE_SECONDS, TimeOffset.TEN_SECONDS, TimeOffset.HALF_MINUTE, TimeOffset.MINUTE]
+        df_trades=df_trades, bounds=bounds, time_offsets=desired_offsets
+    )
+    slippage_features: Dict[str, float] = compute_slippage_features(
+        df_trades=df_trades, bounds=bounds, time_offsets=desired_offsets
     )
 
     return {
         "currency_pair": currency_pair.binance_name,
         "log_interval_return": log_interval_return,
         "num_aggregated_trades": num_aggregated_trades,
-        **volume_imbalance_features
+        **volume_imbalance_features,
+        **slippage_features,
     }

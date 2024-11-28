@@ -34,8 +34,8 @@ class MicrostructurePipeline(FeaturePipeline):
 
 def _test_main():
     hive_dir: Path = Path("D:/data/transformed_data")
-    start_time: datetime = datetime(2024, 9, 1, 10, 20, 1)
-    end_time: datetime = datetime(2024, 9, 18, 10, 23, 36)
+    start_time: datetime = datetime(2024, 9, 1, 10)
+    end_time: datetime = datetime(2024, 9, 1, 12)
 
     bounds: Bounds = Bounds(start_time=start_time, end_time=end_time)
 
