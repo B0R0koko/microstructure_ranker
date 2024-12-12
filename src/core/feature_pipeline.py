@@ -25,7 +25,7 @@ class FeaturePipeline(ABC):
 
         unique_symbols: List[str] = (
             df_hive.filter(
-                pl.col("date").is_between(lower_bound=bounds.start_time.date(), upper_bound=bounds.end_time.date()),
+                pl.col("date").is_between(lower_bound=bounds.start_inclusive.date(), upper_bound=bounds.end_exclusive.date()),
             )
             .select("symbol").unique().collect()["symbol"].to_list()
         )
@@ -40,8 +40,8 @@ class FeaturePipeline(ABC):
         df_currency_pair: pl.LazyFrame = df_hive.filter(
             (pl.col("symbol") == currency_pair.name) &
             # Load data by filtering by both hive folder structure and columns inside each parquet file
-            (pl.col("date").is_between(lower_bound=bounds.start_time.date(), upper_bound=bounds.end_time.date())) &
-            (pl.col("trade_time").is_between(lower_bound=bounds.start_time, upper_bound=bounds.end_time))
+            (pl.col("date").is_between(lower_bound=bounds.start_inclusive.date(), upper_bound=bounds.end_exclusive.date())) &
+            (pl.col("trade_time").is_between(lower_bound=bounds.start_inclusive, upper_bound=bounds.end_exclusive))
         )
 
         return df_currency_pair
@@ -54,12 +54,12 @@ class FeaturePipeline(ABC):
         Returns bounds.end + time_offset return for the specified CurrencyPair
         """
         df_hive: pl.LazyFrame = pl.scan_parquet(self.hive_dir)
-        effective_end_time: datetime = bounds.end_time + time_offset.value  # find end boundary with datetime of return
+        effective_end_time: datetime = bounds.end_exclusive + time_offset.value  # find end boundary with datetime of return
 
         df_currency_pair_return: pl.LazyFrame = df_hive.filter(
             (pl.col("symbol") == currency_pair.name) &
-            (pl.col("date").is_between(lower_bound=bounds.start_time.date(), upper_bound=effective_end_time.date())) &
-            (pl.col("trade_time").is_between(lower_bound=bounds.end_time, upper_bound=effective_end_time))
+            (pl.col("date").is_between(lower_bound=bounds.start_inclusive.date(), upper_bound=effective_end_time.date())) &
+            (pl.col("trade_time").is_between(lower_bound=bounds.end_exclusive, upper_bound=effective_end_time))
         )
         currency_pair_log_return: float = (
             df_currency_pair_return
@@ -89,7 +89,7 @@ class FeaturePipeline(ABC):
                 currency_pair=currency_pair, bounds=bounds
             )
             currency_pair_features["log_return"] = self.attach_currency_pair_return(
-                currency_pair=currency_pair, bounds=bounds, time_offset=TimeOffset.FIVE_SECONDS
+                currency_pair=currency_pair, bounds=bounds, time_offset=TimeOffset.TEN_SECONDS
             )
             cross_section_features.append(currency_pair_features)
 
@@ -109,7 +109,7 @@ def _test_main() -> None:
     start_time: datetime = datetime(2024, 9, 1)
     end_time: datetime = datetime(2024, 9, 20)
 
-    bounds: Bounds = Bounds(start_time=start_time, end_time=end_time)
+    bounds: Bounds = Bounds(start_inclusive=start_time, end_exclusive=end_time)
 
     pipeline: FeaturePipeline = FeaturePipeline(hive_dir=hive_dir)
     pipeline.load_cross_section(bounds=bounds)

@@ -34,10 +34,10 @@ class MicrostructurePipeline(FeaturePipeline):
 
 def _test_main():
     hive_dir: Path = Path("D:/data/transformed_data")
-    start_time: datetime = datetime(2024, 9, 1, 10)
-    end_time: datetime = datetime(2024, 9, 1, 12)
+    start_time: datetime = datetime(2021, 1, 1, 10, 0, 0)
+    end_time: datetime = datetime(2021, 1, 1, 11, 0, 0)
 
-    bounds: Bounds = Bounds(start_time=start_time, end_time=end_time)
+    bounds: Bounds = Bounds(start_inclusive=start_time, end_exclusive=end_time)
 
     pipeline: MicrostructurePipeline = MicrostructurePipeline(hive_dir=hive_dir)
     df_cross_section: pl.DataFrame = pipeline.load_cross_section(bounds=bounds)

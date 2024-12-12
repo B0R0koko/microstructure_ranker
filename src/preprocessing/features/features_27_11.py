@@ -48,7 +48,7 @@ def compute_volume_imbalance(
     return {
         f"volume_imbalance_{offset.name}": (
             df_trades
-            .filter(pl.col("trade_time") >= bounds.end_time - offset.value)
+            .filter(pl.col("trade_time") >= bounds.end_exclusive - offset.value)
             .select(pl.col("quote_sign").sum() / pl.col("quote_abs").sum())
             .collect()
             .item()
@@ -57,14 +57,15 @@ def compute_volume_imbalance(
     }
 
 
-def compute_slippage_features(df_trades: pl.LazyFrame, bounds: Bounds, time_offsets: List[TimeOffset]) -> Dict[
-    str, float]:
+def compute_slippage_features(
+        df_trades: pl.LazyFrame, bounds: Bounds, time_offsets: List[TimeOffset]
+) -> Dict[str, float]:
     """Compute slippage features based on quote_slippage_abs and quote_slippage_sign fields"""
 
     return {
         f"slippage_imbalance_{offset.name}": (
             df_trades
-            .filter(pl.col("trade_time") >= bounds.end_time - offset.value)
+            .filter(pl.col("trade_time") >= bounds.end_exclusive - offset.value)
             .select(pl.col("quote_slippage_sign").sum() / pl.col("quote_slippage_abs").sum())
             .collect()
             .item()
