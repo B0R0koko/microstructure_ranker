@@ -1,5 +1,8 @@
 from abc import ABC, abstractmethod
 from datetime import datetime
+from functools import partial
+from multiprocessing import Pool
+from multiprocessing.pool import AsyncResult
 from pathlib import Path
 from typing import List, Dict, Any
 
@@ -25,7 +28,8 @@ class FeaturePipeline(ABC):
 
         unique_symbols: List[str] = (
             df_hive.filter(
-                pl.col("date").is_between(lower_bound=bounds.start_inclusive.date(), upper_bound=bounds.end_exclusive.date()),
+                pl.col("date").is_between(lower_bound=bounds.start_inclusive.date(),
+                                          upper_bound=bounds.end_exclusive.date()),
             )
             .select("symbol").unique().collect()["symbol"].to_list()
         )
@@ -40,7 +44,8 @@ class FeaturePipeline(ABC):
         df_currency_pair: pl.LazyFrame = df_hive.filter(
             (pl.col("symbol") == currency_pair.name) &
             # Load data by filtering by both hive folder structure and columns inside each parquet file
-            (pl.col("date").is_between(lower_bound=bounds.start_inclusive.date(), upper_bound=bounds.end_exclusive.date())) &
+            (pl.col("date").is_between(lower_bound=bounds.start_inclusive.date(),
+                                       upper_bound=bounds.end_exclusive.date())) &
             (pl.col("trade_time").is_between(lower_bound=bounds.start_inclusive, upper_bound=bounds.end_exclusive))
         )
 
@@ -58,7 +63,8 @@ class FeaturePipeline(ABC):
 
         df_currency_pair_return: pl.LazyFrame = df_hive.filter(
             (pl.col("symbol") == currency_pair.name) &
-            (pl.col("date").is_between(lower_bound=bounds.start_inclusive.date(), upper_bound=effective_end_time.date())) &
+            (pl.col("date").is_between(lower_bound=bounds.start_inclusive.date(),
+                                       upper_bound=effective_end_time.date())) &
             (pl.col("trade_time").is_between(lower_bound=bounds.end_exclusive, upper_bound=effective_end_time))
         )
         currency_pair_log_return: float = (
@@ -79,12 +85,10 @@ class FeaturePipeline(ABC):
         attached
         """
         currency_pairs: List[CurrencyPair] = self._get_currency_pairs_cross_section(bounds=bounds)
-        pbar = tqdm(currency_pairs)
-
         cross_section_features: List[Dict[str, Any]] = []
 
-        for currency_pair in pbar:
-            pbar.set_description(desc=f"Computing features for {currency_pair.name}")
+        for currency_pair in currency_pairs:
+            # pbar.set_description(desc=f"Computing features for {currency_pair.name}")
             currency_pair_features: Dict[str, Any] = self.compute_features_for_currency_pair(
                 currency_pair=currency_pair, bounds=bounds
             )
@@ -94,6 +98,24 @@ class FeaturePipeline(ABC):
             cross_section_features.append(currency_pair_features)
 
         return pl.DataFrame(cross_section_features)
+
+    # Parallelize this function to be able to run at least using 10 processes
+    def load_multiple_cross_sections(self, cross_section_bounds: List[Bounds]) -> None:
+        with (
+            tqdm(total=len(cross_section_bounds), desc="Computing cross-sections with multiprocessing: ") as pbar,
+            Pool(processes=10) as pool,
+        ):
+            promises: List[AsyncResult] = []
+
+            for bounds in cross_section_bounds:
+                promise: AsyncResult = pool.apply_async(
+                    partial(self.load_cross_section, bounds=bounds)
+                )
+                promises.append(promise)
+
+            for promise in promises:
+                df_cross_section: pl.DataFrame = promise.get()  # fetch output of self.load_cross_section from Future
+                pbar.update(1)
 
     @abstractmethod
     def compute_features_for_currency_pair(self, currency_pair: CurrencyPair, bounds: Bounds) -> Dict[str, Any]:

@@ -1,6 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 import polars as pl
 
@@ -34,14 +34,17 @@ class MicrostructurePipeline(FeaturePipeline):
 
 def _test_main():
     hive_dir: Path = Path("D:/data/transformed_data")
-    start_time: datetime = datetime(2021, 1, 1, 10, 0, 0)
-    end_time: datetime = datetime(2021, 1, 1, 11, 0, 0)
+    start_time: datetime = datetime(2024, 11, 1, 0, 0, 0)
+    end_time: datetime = datetime(2024, 11, 1, 1, 0, 0)
+    step: timedelta = timedelta(seconds=10)
+    interval: timedelta = timedelta(minutes=15)
 
     bounds: Bounds = Bounds(start_inclusive=start_time, end_exclusive=end_time)
+    cross_section_bounds: List[Bounds] = bounds.generate_overlapping_bounds(step=step, interval=interval)
 
     pipeline: MicrostructurePipeline = MicrostructurePipeline(hive_dir=hive_dir)
-    df_cross_section: pl.DataFrame = pipeline.load_cross_section(bounds=bounds)
-    print(df_cross_section)
+    # Run multiprocessing pipeline for multiple cross-sections
+    pipeline.load_multiple_cross_sections(cross_section_bounds=cross_section_bounds)
 
 
 if __name__ == "__main__":

@@ -1,6 +1,5 @@
 from typing import Dict, Any, List
 
-import numpy as np
 import polars as pl
 
 from core.currency import CurrencyPair
@@ -36,6 +35,10 @@ def aggregate_ticks_into_trades(df_currency_pair: pl.LazyFrame) -> pl.LazyFrame:
             quantity_abs=pl.col("quantity").sum(),
             quantity_sign=pl.col("quantity_sign").sum(),
         )
+    )
+    # Create boolean indicating if the trade was long or short
+    df_trades = df_trades.with_columns(
+        (pl.col("quantity_sign") >= 0).alias("is_long")
     )
     return df_trades
 
@@ -74,6 +77,56 @@ def compute_slippage_features(
     }
 
 
+def compute_share_of_longs(
+        df_trades: pl.LazyFrame, bounds: Bounds, time_offsets: List[TimeOffset]
+) -> Dict[str, float]:
+    """Compute share of longs in overall number of trades"""
+    return {
+        f"share_of_long_trades_{offset.name}": (
+            df_trades
+            .filter(pl.col("trade_time") >= bounds.end_exclusive - offset.value)
+            .select(pl.col("is_long").sum() / pl.len())
+            .collect()
+            .item()
+        ) for offset in time_offsets
+    }
+
+
+def compute_log_return_features(
+        df_trades: pl.LazyFrame, bounds: Bounds, time_offsets: List[TimeOffset]
+) -> Dict[str, float]:
+    """Compute log returns for different intervals before the prediction timestamp with different time_offsets"""
+    return {
+        f"log_return_{offset.name}": (
+            df_trades
+            .filter(pl.col("trade_time") >= bounds.end_exclusive - offset.value)
+            .select((pl.col("price_last").last() / pl.col("price_first").first()).log())
+            .collect()
+            .item()
+        )
+        for offset in time_offsets
+    }
+
+
+def compute_alpha_powerlaw(
+        df_trades: pl.LazyFrame, bounds: Bounds, time_offsets: List[TimeOffset]
+) -> Dict[str, float]:
+    """Compute alpha using MLE estimate for alpha in Powerlaw"""
+    return {
+        f"mle_alpha_powerlaw_{offset.name}": (
+            df_trades
+            .filter(pl.col("trade_time") >= bounds.end_exclusive - offset.value)
+            # 1 + N / (sum log(q / q_min))
+            .select(
+                1 + pl.len() / (pl.col("quote_abs") / pl.col("quote_abs").min()).log().sum()
+            )
+            .collect()
+            .item()
+        )
+        for offset in time_offsets
+    }
+
+
 def compute_features(df_currency_pair: pl.LazyFrame, currency_pair: CurrencyPair, bounds: Bounds) -> Dict[str, Any]:
     """Computes features for a give currency pair"""
     # Compute quote_volumes
@@ -91,29 +144,36 @@ def compute_features(df_currency_pair: pl.LazyFrame, currency_pair: CurrencyPair
     df_trades = aggregate_ticks_into_trades(df_currency_pair=df_currency_pair)
     df_trades = compute_slippage(df_trades=df_trades)
 
-    # Now after all preprocessing compute features for CurrencyPair
-    # number of aggregated trades within the time interval of df_currency_pair
-    num_aggregated_trades: int = df_trades.select(pl.len()).collect().item()
-
-    prices = df_trades.select(pl.col("price_first").first(), pl.col("price_last").last())
-    price_first, price_last = [price.item() for price in prices.collect()]
-
-    log_interval_return: float = np.log(price_last / price_first)
-
     desired_offsets: List[TimeOffset] = [
-        TimeOffset.FIVE_SECONDS, TimeOffset.TEN_SECONDS, TimeOffset.HALF_MINUTE, TimeOffset.MINUTE
+        TimeOffset.FIVE_SECONDS,
+        TimeOffset.TEN_SECONDS,
+        TimeOffset.HALF_MINUTE,
+        TimeOffset.MINUTE,
+        TimeOffset.FIVE_MINUTES
     ]
+
+    # Start computing features using desired offsets
     volume_imbalance_features: Dict[str, float] = compute_volume_imbalance(
         df_trades=df_trades, bounds=bounds, time_offsets=desired_offsets
     )
     slippage_features: Dict[str, float] = compute_slippage_features(
         df_trades=df_trades, bounds=bounds, time_offsets=desired_offsets
     )
+    log_return_features: Dict[str, float] = compute_log_return_features(
+        df_trades=df_trades, bounds=bounds, time_offsets=desired_offsets
+    )
+    num_trades_features: Dict[str, float] = compute_share_of_longs(
+        df_trades=df_trades, bounds=bounds, time_offsets=desired_offsets
+    )
+    powerlaw_features: Dict[str, float] = compute_alpha_powerlaw(
+        df_trades=df_trades, bounds=bounds, time_offsets=desired_offsets
+    )
 
     return {
         "currency_pair": currency_pair.binance_name,
-        "log_interval_return": log_interval_return,
-        "num_aggregated_trades": num_aggregated_trades,
+        **log_return_features,
+        **num_trades_features,
         **volume_imbalance_features,
         **slippage_features,
+        **powerlaw_features
     }

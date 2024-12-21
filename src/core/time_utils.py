@@ -81,14 +81,30 @@ class Bounds:
     def __str__(self) -> str:
         return f"Bounds: {self.start_inclusive} - {self.end_exclusive}"
 
+    def generate_overlapping_bounds(self, step: timedelta, interval: timedelta) -> List["Bounds"]:
+        """Returns a list of bounds created from parent Bounds interval with a certain interval size and step"""
+        intervals: List["Bounds"] = []
+
+        lb = self.start_inclusive
+
+        while True:
+            rb: datetime = lb + interval
+            intervals.append(Bounds(start_inclusive=lb, end_exclusive=rb))  # create new overlapping sub-Bounds
+            lb += step
+
+            if rb >= self.end_exclusive:
+                break
+
+        return intervals
+
 
 class TimeOffset(Enum):
     FIVE_SECONDS: timedelta = timedelta(seconds=5)
     TEN_SECONDS: timedelta = timedelta(seconds=10)
     HALF_MINUTE: timedelta = timedelta(seconds=30)
     MINUTE: timedelta = timedelta(minutes=1)
-    FIVE_MINUTE: timedelta = timedelta(minutes=5)
-    FIFTEEN_MINUTE: timedelta = timedelta(minutes=15)
+    FIVE_MINUTES: timedelta = timedelta(minutes=5)
+    FIFTEEN_MINUTES: timedelta = timedelta(minutes=15)
     HALF_HOUR: timedelta = timedelta(minutes=30)
 
 
