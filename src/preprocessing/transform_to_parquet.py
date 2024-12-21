@@ -29,7 +29,7 @@ def save_to_pyarrow_hive(
     read_options: csv.ReadOptions = csv.ReadOptions(
         column_names=new_columns,
         block_size=MB * 128,  # batch_size in megabytes
-        use_threads=True
+        use_threads=None
     )
     # subset leave_cols from new_columns
     convert_options: csv.ConvertOptions = csv.ConvertOptions(include_columns=leave_cols)
@@ -57,6 +57,7 @@ def save_to_pyarrow_hive(
                     "existing_data_behavior": "overwrite_or_ignore",
                 }
             )
+
 
 def check_if_zipped_file_is_csv(file_path: str) -> bool:
     """Checks if zipped file stored is a csv"""

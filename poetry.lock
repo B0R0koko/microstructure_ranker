@@ -1930,6 +1930,20 @@ files = [
 traitlets = "*"
 
 [[package]]
+name = "memory-profiler"
+version = "0.61.0"
+description = "A module for monitoring memory usage of a python program"
+optional = false
+python-versions = ">=3.5"
+files = [
+    {file = "memory_profiler-0.61.0-py3-none-any.whl", hash = "sha256:400348e61031e3942ad4d4109d18753b2fb08c2f6fb8290671c5513a34182d84"},
+    {file = "memory_profiler-0.61.0.tar.gz", hash = "sha256:4e5b73d7864a1d1292fb76a03e82a3e78ef934d06828a698d9dada76da2067b0"},
+]
+
+[package.dependencies]
+psutil = "*"
+
+[[package]]
 name = "mistune"
 version = "3.0.2"
 description = "A sane and fast Markdown parser with useful plugins and renderers"
@@ -3703,4 +3717,4 @@ testing = ["coverage (>=5.0.3)", "zope.event", "zope.testing"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.12"
-content-hash = "5274dcd20c2a415b33b062515191259431e8cc0adb6cede788b3c84cd68b19c1"
+content-hash = "771330370cbf568094a88cdbff40779de650f2cf2fa40e0795b4d799c67ab577"

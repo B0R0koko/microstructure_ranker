@@ -14,9 +14,7 @@ class MicrostructurePipeline(FeaturePipeline):
     """Define first feature pipeline here. Make sure to implement all methods from abstract parent class"""
 
     def __init__(self, hive_dir: Path):
-        super().__init__(
-            hive_dir=hive_dir
-        )
+        super().__init__(hive_dir=hive_dir)
 
     def compute_features_for_currency_pair(self, currency_pair: CurrencyPair, bounds: Bounds) -> Dict[str, Any]:
         """
@@ -36,7 +34,7 @@ def _test_main():
     hive_dir: Path = Path("D:/data/transformed_data")
     start_time: datetime = datetime(2024, 11, 1, 0, 0, 0)
     end_time: datetime = datetime(2024, 11, 1, 1, 0, 0)
-    step: timedelta = timedelta(seconds=10)
+    step: timedelta = timedelta(minutes=5)
     interval: timedelta = timedelta(minutes=15)
 
     bounds: Bounds = Bounds(start_inclusive=start_time, end_exclusive=end_time)
@@ -44,7 +42,10 @@ def _test_main():
 
     pipeline: MicrostructurePipeline = MicrostructurePipeline(hive_dir=hive_dir)
     # Run multiprocessing pipeline for multiple cross-sections
-    pipeline.load_multiple_cross_sections(cross_section_bounds=cross_section_bounds)
+    df: pl.DataFrame = pipeline.load_multiple_cross_sections(
+        cross_section_bounds=cross_section_bounds
+    )
+    df.to_pandas().to_csv("D:/data/final/features.csv", index=False)
 
 
 if __name__ == "__main__":
