@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
 from datetime import datetime, timedelta
 from functools import partial
-from multiprocessing import get_context
+from multiprocessing import Pool
 from multiprocessing.pool import AsyncResult
 from pathlib import Path
-from random import shuffle
 from typing import List, Dict, Any
 
 import polars as pl
@@ -18,6 +17,7 @@ class FeaturePipeline(ABC):
 
     def __init__(self, hive_dir: Path):
         self.hive_dir: Path = hive_dir
+        self.return_timedelta: TimeOffset = TimeOffset.MINUTE
 
     def _get_currency_pairs_cross_section(self, bounds: Bounds) -> List[CurrencyPair]:
         """
@@ -36,48 +36,37 @@ class FeaturePipeline(ABC):
             )
             .select("symbol").unique().collect()["symbol"].to_list()
         )
-        shuffle(unique_symbols)
 
         return [CurrencyPair.from_string(symbol=symbol) for symbol in unique_symbols]
 
-    def load_currency_pair_dataframe(self, currency_pair: CurrencyPair, bounds: Bounds) -> pl.LazyFrame:
-        """Load data for a given CurrencyPair with specific time interval [start_time, end_time)"""
+    def load_currency_pair_dataframe(self, currency_pair: CurrencyPair, bounds: Bounds) -> pl.DataFrame:
+        """Load data for a given CurrencyPair with specific time interval [start_time, end_time + return_timedelta)"""
 
         df_hive: pl.LazyFrame = pl.scan_parquet(self.hive_dir, hive_partitioning=True)
-
+        effective_end_time: datetime = bounds.end_exclusive + self.return_timedelta.value
         df_currency_pair: pl.LazyFrame = df_hive.filter(
             (pl.col("symbol") == currency_pair.name) &
             # Load data by filtering by both hive folder structure and columns inside each parquet file
             (pl.col("date").is_between(lower_bound=bounds.start_inclusive.date(),
                                        upper_bound=bounds.end_exclusive.date())) &
-            (pl.col("trade_time").is_between(lower_bound=bounds.start_inclusive, upper_bound=bounds.end_exclusive))
+            (pl.col("trade_time").is_between(lower_bound=bounds.start_inclusive,
+                                             upper_bound=effective_end_time))
         )
 
-        return df_currency_pair
+        return df_currency_pair.collect()
 
-    def attach_currency_pair_return(
-            self, currency_pair: CurrencyPair, bounds: Bounds, time_offset: TimeOffset
-    ) -> float:
+    def attach_currency_pair_return(self, df_currency_pair: pl.DataFrame, bounds: Bounds) -> float:
         """
         Attaches return column for a specified timedelta, how far into the future we would like to compute the return.
         Returns bounds.end + time_offset return for the specified CurrencyPair
         """
-        df_hive: pl.LazyFrame = pl.scan_parquet(self.hive_dir, hive_partitioning=True)
-        effective_end_time: datetime = bounds.end_exclusive + time_offset.value  # find end boundary with datetime of return
-
-        df_currency_pair_return: pl.LazyFrame = df_hive.filter(
-            (pl.col("symbol") == currency_pair.name) &
-            (pl.col("date").is_between(lower_bound=bounds.start_inclusive.date(),
-                                       upper_bound=effective_end_time.date())) &
-            (pl.col("trade_time").is_between(lower_bound=bounds.end_exclusive, upper_bound=effective_end_time))
-        )
+        effective_end_time: datetime = bounds.end_exclusive + self.return_timedelta.value
         currency_pair_log_return: float = (
-            df_currency_pair_return
-            .sort(by="trade_time", descending=False)
-            .select(
-                (pl.col("price").last() / pl.col("price").first()).log()
+            df_currency_pair
+            .filter(
+                pl.col("trade_time").is_between(lower_bound=bounds.end_exclusive, upper_bound=effective_end_time)
             )
-            .collect()
+            .select((pl.col("price").last() / pl.col("price").first()).log())
             .item()
         )
         return currency_pair_log_return
@@ -92,12 +81,16 @@ class FeaturePipeline(ABC):
         cross_section_features: List[Dict[str, Any]] = []
 
         for currency_pair in currency_pairs:
-            # pbar.set_description(desc=f"Computing features for {currency_pair.name}")
-            currency_pair_features: Dict[str, Any] = self.compute_features_for_currency_pair(
+            # Load and collect pl.DataFrame for current CurrencyPair, read to RAM no avoid calling collect multiple times
+            df_currency_pair: pl.DataFrame = self.load_currency_pair_dataframe(
                 currency_pair=currency_pair, bounds=bounds
             )
+            # Compute features using loaded pl.DataFrame
+            currency_pair_features: Dict[str, Any] = self.compute_features_for_currency_pair(
+                currency_pair=currency_pair, df_currency_pair=df_currency_pair, bounds=bounds
+            )
             currency_pair_features["log_return"] = self.attach_currency_pair_return(
-                currency_pair=currency_pair, bounds=bounds, time_offset=TimeOffset.TEN_SECONDS
+                df_currency_pair=df_currency_pair, bounds=bounds
             )
             cross_section_features.append(currency_pair_features)
 
@@ -114,7 +107,7 @@ class FeaturePipeline(ABC):
 
         with (
             tqdm(total=len(cross_section_bounds), desc="Computing cross-sections with multiprocessing: ") as pbar,
-            get_context("spawn").Pool(processes=10) as pool,
+            Pool(processes=10) as pool,
         ):
             promises: List[AsyncResult] = []
 
@@ -133,7 +126,9 @@ class FeaturePipeline(ABC):
         return pl.concat(dfs)
 
     @abstractmethod
-    def compute_features_for_currency_pair(self, currency_pair: CurrencyPair, bounds: Bounds) -> Dict[str, Any]:
+    def compute_features_for_currency_pair(
+            self, currency_pair: CurrencyPair, df_currency_pair: pl.DataFrame, bounds: Bounds
+    ) -> Dict[str, Any]:
         """
         Define logic of how we load data for a passed in currency_pair as well as how we compute features. This method
         must return pl.DataFrame with all compute features. Later this dataframe will be attached to df_cross_sections:

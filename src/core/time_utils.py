@@ -106,6 +106,7 @@ class TimeOffset(Enum):
     FIVE_MINUTES: timedelta = timedelta(minutes=5)
     FIFTEEN_MINUTES: timedelta = timedelta(minutes=15)
     HALF_HOUR: timedelta = timedelta(minutes=30)
+    HOUR: timedelta = timedelta(hours=1)
 
 
 if __name__ == "__main__":
