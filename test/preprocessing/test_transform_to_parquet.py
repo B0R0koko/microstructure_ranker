@@ -6,7 +6,7 @@ import pandas as pd
 import polars as pl
 
 from core.currency import CurrencyPair
-from preprocessing.transform_to_parquet import ParquetTransformer
+from preprocessing.uploader_to_hive import ParquetTransformer
 
 
 def unzip_and_load_as_csv(zip_file_path: Path, temp_unzip_dir: Path) -> pd.DataFrame:

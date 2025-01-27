@@ -142,12 +142,12 @@ def compute_features(df_currency_pair: pl.DataFrame, currency_pair: CurrencyPair
     df_trades = compute_slippage(df_trades=df_trades)
 
     desired_offsets: List[TimeOffset] = [
-        TimeOffset.FIVE_SECONDS,
-        TimeOffset.TEN_SECONDS,
-        TimeOffset.HALF_MINUTE,
         TimeOffset.MINUTE,
         TimeOffset.FIVE_MINUTES,
-        TimeOffset.FIFTEEN_MINUTES,
+        TimeOffset.HALF_HOUR,
+        TimeOffset.HOUR,
+        TimeOffset.TWO_HOURS,
+        TimeOffset.FOUR_HOURS
     ]
     # Start computing features using desired offsets
     volume_imbalance_features: Dict[str, float] = compute_volume_imbalance(

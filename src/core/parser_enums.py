@@ -10,3 +10,9 @@ class CollectMode(Enum):
 
     def lower(self) -> str:
         return self.name.lower()
+
+
+class KlineInterval(Enum):
+    MINUTE = "1m"
+    HOUR = "1h"
+    DAY = "1d"

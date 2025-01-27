@@ -1,66 +1,57 @@
-# pylint: disable=use-dict-literal
-
 import re
-from datetime import datetime
+from abc import ABC, abstractmethod
+from datetime import date, datetime
 from pathlib import Path
-from typing import List, Dict, Optional, Any
-from urllib.parse import urlencode
+from typing import List, Optional, Tuple, Dict, Any
 
 import scrapy
-from scrapy.crawler import CrawlerProcess
-from scrapy.http import Request
-from scrapy.http.response import Response
+from scrapy import Request
+from scrapy.http import Response
 
-from core.collect_mode import CollectMode
 from core.currency import CurrencyPair
+from core.parser_enums import CollectMode
 from core.time_utils import Bounds, start_of_the_day
-from data_collection.datavision.settings import SETTINGS
 
 BINANCE_S3: str = "https://s3-ap-northeast-1.amazonaws.com/data.binance.vision"
 BINANCE_DATAVISION: str = "https://data.binance.vision"
 
 
-def get_currency_url(
-        currency_pair: CurrencyPair,
-        collect_mode: CollectMode,
-        marker: Optional[str] = None
-) -> str:
-    """Create url which we use to query binance data vision for the first time for each ticker"""
-    params: Dict[str, str] = {
-        "delimiter": "/",
-        # data/spot/daily/trades/1INCHBUSD/
-        "prefix": f"data/spot/{collect_mode.lower()}/trades/{currency_pair.binance_name}/",
-    }
+def filter_hrefs_by_bounds(
+        hrefs: List[str], bounds: Bounds, collect_mode: CollectMode
+) -> Tuple[List[str], List[date]]:
+    """Takes bounds as input and returns a list of hrefs that matches passed in Bounds"""
 
-    if marker:
-        params["marker"] = marker
+    filtered_hrefs: List[str] = []
+    href_dates: List[date] = []
 
-    datavision_url: str = f"{BINANCE_S3}?{urlencode(params)}"
-    return datavision_url
+    pattern_str: str = (
+        r"\d{4}-\d{2}" if collect_mode == CollectMode.MONTHLY else
+        r"\d{4}-\d{2}-\d{2}"
+    )
+
+    for href in hrefs:
+        # Find date in href string and parse it to datetime
+        href_date_string: str = re.search(pattern=pattern_str, string=href)[0]
+        href_date: datetime = start_of_the_day(
+            day=datetime.strptime(
+                href_date_string,
+                # collect_mode is monthly parse yyyy-mm, if daily parse yyyy-mm-dd
+                "%Y-%m" if collect_mode == CollectMode.MONTHLY else "%Y-%m-%d"
+            ).date()
+        )
+        if bounds.start_inclusive <= href_date <= bounds.end_exclusive:
+            filtered_hrefs.append(href)
+            href_dates.append(href_date)
+
+    return filtered_hrefs, href_dates
 
 
 def get_zip_file_url(href: str) -> str:
     """Returns a formatted url string which leads to a zip file with trades data"""
-    # https://data.binance.vision/data/spot/monthly/trades/1INCHUSDT/1INCHUSDT-trades-2024-05.zip
     return f"{BINANCE_DATAVISION}/{href}"
 
 
-def filter_hrefs_by_bounds(hrefs: List[str], bounds: Bounds) -> List[str]:
-    """Takes bounds as input and returns a list of hrefs that matches passed in Bounds"""
-    filtered_hrefs: List[str] = []
-    for href in hrefs:
-        # Find date in href string and parse it to datetime
-        href_date_string: str = re.search(pattern=r"(\d{4}-\d{2})", string=href)[1]
-        href_date: datetime = start_of_the_day(
-            day=datetime.strptime(href_date_string, '%Y-%m').date()
-        )
-        if bounds.start_inclusive <= href_date <= bounds.end_exclusive:
-            filtered_hrefs.append(href)
-    return filtered_hrefs
-
-
-class TradesCrawler(scrapy.Spider):
-    name = "ticker_crawler"
+class DataParser(ABC, scrapy.Spider):
 
     def __init__(
             self,
@@ -76,10 +67,15 @@ class TradesCrawler(scrapy.Spider):
         self.collect_mode: CollectMode = collect_mode
         self.output_dir: Path = output_dir
 
+    @abstractmethod
+    def get_currency_url(self, currency_pair: CurrencyPair, marker: Optional[str] = None) -> str:
+        """Returns a string url for a given CurrencyPair"""
+
     def start_requests(self) -> scrapy.Request:
+        """This method is run first when the Spider starts"""
         for currency_pair in self.currency_pairs:
             yield Request(
-                url=get_currency_url(currency_pair, collect_mode=self.collect_mode),
+                url=self.get_currency_url(currency_pair),
                 callback=self.parse_currency_pair,  # type:ignore
                 meta={"currency_pair": currency_pair, "href_container": []},  # mutable object
             )
@@ -95,21 +91,21 @@ class TradesCrawler(scrapy.Spider):
 
         hrefs: List[str] = re.findall(pattern=r"<Key>(.*?)</Key>", string=response.text)
         hrefs: List[str] = [href for href in hrefs if "CHECKSUM" not in href]
-
         href_container.extend(hrefs)
 
         # if len is 500, then we need to send another request with marker param which is the last entry in hrefs
         if len(hrefs) == 500:
             yield scrapy.Request(
-                url=get_currency_url(currency_pair=currency_pair, collect_mode=self.collect_mode, marker=hrefs[-1]),
+                url=self.get_currency_url(currency_pair=currency_pair, marker=hrefs[-1]),
                 callback=self.parse_currency_pair,  # call itself one more time
                 meta={"currency_pair": currency_pair, "href_container": href_container},
             )
         # Once we have collected all hrefs into response.meta.href_container we loop over it and send requests that
         # collect zip files
-
         # Filter hrefs by dates that we want to collect data for
-        filtered_hrefs: List[str] = filter_hrefs_by_bounds(hrefs=href_container, bounds=self.bounds)
+        filtered_hrefs, _ = filter_hrefs_by_bounds(
+            hrefs=href_container, bounds=self.bounds, collect_mode=self.collect_mode
+        )
 
         for href in filtered_hrefs:
             yield scrapy.Request(
@@ -125,19 +121,3 @@ class TradesCrawler(scrapy.Spider):
             "href": response.meta.get("href"),
             "currency_pair": response.meta.get("currency_pair"),
         }
-
-
-if __name__ == "__main__":
-    data_dir: Path = Path("D:/data")
-
-    process: CrawlerProcess = CrawlerProcess(
-        settings=SETTINGS
-    )
-
-    process.crawl(
-        TradesCrawler,
-        currency_pairs=[CurrencyPair("ADA", "USDT")],
-        collect_mode=CollectMode.MONTHLY,
-        output_dir=data_dir
-    )
-    process.start()

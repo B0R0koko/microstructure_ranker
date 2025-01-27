@@ -72,10 +72,14 @@ class Bounds:
     end_exclusive: datetime
 
     @classmethod
-    def for_days(cls, start_date: date, end_date: date):
+    def for_days(cls, start_inclusive: date, end_exclusive: date):
+        """
+        For instance if we pass start_inclusive = date(2024, 11, 1) and end_exclusive = date(2024, 12, 1),
+        Final Bounds will have the following datetime (2024-11-01 0:00:00, 2024-11-30 23:59:59)
+        """
         return cls(
-            start_inclusive=start_of_the_day(day=start_date),
-            end_exclusive=end_of_the_day(day=end_date),
+            start_inclusive=start_of_the_day(day=start_inclusive),
+            end_exclusive=end_of_the_day(day=end_exclusive - timedelta(days=1)),
         )
 
     def __str__(self) -> str:
@@ -107,6 +111,8 @@ class TimeOffset(Enum):
     FIFTEEN_MINUTES: timedelta = timedelta(minutes=15)
     HALF_HOUR: timedelta = timedelta(minutes=30)
     HOUR: timedelta = timedelta(hours=1)
+    TWO_HOURS: timedelta = timedelta(hours=2)
+    FOUR_HOURS: timedelta = timedelta(hours=4)
 
 
 if __name__ == "__main__":

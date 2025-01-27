@@ -4,16 +4,31 @@
     <option name="autoReloadType" value="SELECTIVE" />
   </component>
   <component name="ChangeListManager">
-    <list default="true" id="0bf46980-4d24-4486-9bde-27c6d44732e5" name="Changes" comment="added partitioning with pyarrow backend">
+    <list default="true" id="0bf46980-4d24-4486-9bde-27c6d44732e5" name="Changes" comment="updated notebook">
+      <change afterPath="$PROJECT_DIR$/src/analysis/proto.ipynb" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data_collection/datavision/parsers/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data_collection/datavision/parsers/klines.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/data_collection/datavision/parsers/trades.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/models/klines/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/models/trades/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/models/trades/features/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/preprocessing/pipelines/__init__.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/preprocessing/pipelines/load_klines_to_hive.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/src/preprocessing/pipelines/load_trades_to_hive.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/poetry.lock" beforeDir="false" afterPath="$PROJECT_DIR$/poetry.lock" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/pyproject.toml" beforeDir="false" afterPath="$PROJECT_DIR$/pyproject.toml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/core/currency.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/currency.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data_collection/datavision/crawler.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_collection/datavision/crawler.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/collect_mode.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/parser_enums.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/columns.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/columns.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/feature_pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/feature_pipeline.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/core/time_utils.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/core/time_utils.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_collection/datavision/crawler.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/data_collection/datavision/pipelines/zip_pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_collection/datavision/pipelines/zip_pipeline.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/data_collection/datavision/run.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_collection/datavision/run.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/data_collection/notebooks/prototyping.ipynb" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_collection/notebooks/prototyping.ipynb" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/preprocessing/features/__init__.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/data_collection/datavision/parser.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/preprocessing/features/features_27_11.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/trades/features/features_27_11.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/preprocessing/microstructure_pipeline.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/models/trades/microstructure_pipeline.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/src/preprocessing/run.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/preprocessing/run.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/src/preprocessing/transform_to_parquet.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/preprocessing/transform_to_parquet.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/src/preprocessing/transform_to_parquet.py" beforeDir="false" afterPath="$PROJECT_DIR$/src/preprocessing/uploader_to_hive.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/test/preprocessing/test_transform_to_parquet.py" beforeDir="false" afterPath="$PROJECT_DIR$/test/preprocessing/test_transform_to_parquet.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -23,6 +38,7 @@
   <component name="FileTemplateManagerImpl">
     <option name="RECENT_TEMPLATES">
       <list>
+        <option value="Jupyter Notebook" />
         <option value="Python Script" />
       </list>
     </option>
@@ -62,33 +78,64 @@
     <option name="hideEmptyMiddlePackages" value="true" />
     <option name="showLibraryContents" value="true" />
   </component>
-  <component name="PropertiesComponent"><![CDATA[{
-  "keyToString": {
-    "Python.crawler.executor": "Run",
-    "Python.run (1).executor": "Run",
-    "Python.run.executor": "Run",
-    "Python.transform_to_parquet.executor": "Run",
-    "RunOnceActivity.OpenProjectViewOnStart": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "git-widget-placeholder": "#18 on 17-add-feature-computation-pipeline",
-    "ignore.virus.scanning.warn.message": "true",
-    "last_opened_file_path": "D:/Masha/car_detection",
-    "node.js.detected.package.eslint": "true",
-    "node.js.detected.package.tslint": "true",
-    "node.js.selected.package.eslint": "(autodetect)",
-    "node.js.selected.package.tslint": "(autodetect)",
-    "nodejs_package_manager_path": "npm",
-    "settings.editor.selected.configurable": "preferences.lookFeel",
-    "vue.rearranger.settings.migration": "true"
+  <component name="PropertiesComponent">{
+  &quot;keyToString&quot;: {
+    &quot;Python.crawler.executor&quot;: &quot;Run&quot;,
+    &quot;Python.feature_pipeline.executor&quot;: &quot;Run&quot;,
+    &quot;Python.microstructure_pipeline.executor&quot;: &quot;Run&quot;,
+    &quot;Python.parse_klines.executor&quot;: &quot;Run&quot;,
+    &quot;Python.run (1).executor&quot;: &quot;Run&quot;,
+    &quot;Python.run.executor&quot;: &quot;Run&quot;,
+    &quot;Python.time_utils.executor&quot;: &quot;Run&quot;,
+    &quot;Python.transform_to_parquet.executor&quot;: &quot;Run&quot;,
+    &quot;RunOnceActivity.OpenProjectViewOnStart&quot;: &quot;true&quot;,
+    &quot;RunOnceActivity.ShowReadmeOnStart&quot;: &quot;true&quot;,
+    &quot;git-widget-placeholder&quot;: &quot;17-add-feature-computation-pipeline&quot;,
+    &quot;ignore.virus.scanning.warn.message&quot;: &quot;true&quot;,
+    &quot;last_opened_file_path&quot;: &quot;D:/HSE/Introduction_Python/in_class_assignments/in_class_assignment_3&quot;,
+    &quot;node.js.detected.package.eslint&quot;: &quot;true&quot;,
+    &quot;node.js.detected.package.tslint&quot;: &quot;true&quot;,
+    &quot;node.js.selected.package.eslint&quot;: &quot;(autodetect)&quot;,
+    &quot;node.js.selected.package.tslint&quot;: &quot;(autodetect)&quot;,
+    &quot;nodejs_package_manager_path&quot;: &quot;npm&quot;,
+    &quot;settings.editor.selected.configurable&quot;: &quot;preferences.lookFeel&quot;,
+    &quot;vue.rearranger.settings.migration&quot;: &quot;true&quot;
   }
-}]]></component>
+}</component>
   <component name="RecentsManager">
     <key name="MoveFile.RECENT_KEYS">
+      <recent name="C:\Users\mihai\PycharmProjects\microstructure_price_prediction\src\models\trades" />
+      <recent name="C:\Users\mihai\PycharmProjects\microstructure_price_prediction\src\models" />
+      <recent name="D:\data\final" />
+      <recent name="C:\Users\mihai\PycharmProjects\microstructure_price_prediction\src\analysis" />
       <recent name="C:\Users\mihai\PycharmProjects\microstructure_price_prediction\src" />
     </key>
   </component>
   <component name="RunManager" selected="Python.run (1)">
-    <configuration name="crawler" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="microstructure_pipeline" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="microstructure_price_prediction" />
+      <option name="ENV_FILES" value="" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src/preprocessing" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="C:\Users\mihai\PycharmProjects\microstructure_price_prediction\src\models\trades\microstructure_pipeline.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="parse_klines" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="microstructure_price_prediction" />
       <option name="ENV_FILES" value="" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -102,7 +149,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/data_collection/datavision/crawler.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/data_collection/datavision/parse_klines.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -157,30 +204,7 @@
       <option name="INPUT_FILE" value="" />
       <method v="2" />
     </configuration>
-    <configuration name="run_two" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
-      <module name="microstructure_price_prediction" />
-      <option name="ENV_FILES" value="" />
-      <option name="INTERPRETER_OPTIONS" value="" />
-      <option name="PARENT_ENVS" value="true" />
-      <envs>
-        <env name="PYTHONUNBUFFERED" value="1" />
-      </envs>
-      <option name="SDK_HOME" value="" />
-      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/src/data_collection/notebooks" />
-      <option name="IS_MODULE_SDK" value="true" />
-      <option name="ADD_CONTENT_ROOTS" value="true" />
-      <option name="ADD_SOURCE_ROOTS" value="true" />
-      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/data_collection/notebooks/run_two.py" />
-      <option name="PARAMETERS" value="" />
-      <option name="SHOW_COMMAND_LINE" value="false" />
-      <option name="EMULATE_TERMINAL" value="false" />
-      <option name="MODULE_MODE" value="false" />
-      <option name="REDIRECT_INPUT" value="false" />
-      <option name="INPUT_FILE" value="" />
-      <method v="2" />
-    </configuration>
-    <configuration name="transform_to_parquet" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+    <configuration name="uploader_to_hive" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <module name="microstructure_price_prediction" />
       <option name="ENV_FILES" value="" />
       <option name="INTERPRETER_OPTIONS" value="" />
@@ -194,7 +218,7 @@
       <option name="ADD_CONTENT_ROOTS" value="true" />
       <option name="ADD_SOURCE_ROOTS" value="true" />
       <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
-      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/src/preprocessing/transform_to_parquet.py" />
+      <option name="SCRIPT_NAME" value="C:\Users\mihai\PycharmProjects\microstructure_price_prediction\src\preprocessing\uploader_to_hive.py" />
       <option name="PARAMETERS" value="" />
       <option name="SHOW_COMMAND_LINE" value="false" />
       <option name="EMULATE_TERMINAL" value="false" />
@@ -206,10 +230,10 @@
     <recent_temporary>
       <list>
         <item itemvalue="Python.run (1)" />
-        <item itemvalue="Python.transform_to_parquet" />
+        <item itemvalue="Python.uploader_to_hive" />
         <item itemvalue="Python.run" />
-        <item itemvalue="Python.crawler" />
-        <item itemvalue="Python.run_two" />
+        <item itemvalue="Python.parse_klines" />
+        <item itemvalue="Python.microstructure_pipeline" />
       </list>
     </recent_temporary>
   </component>
@@ -241,6 +265,38 @@
       <workItem from="1731613868168" duration="4572000" />
       <workItem from="1731658007691" duration="3000" />
       <workItem from="1731785119548" duration="1365000" />
+      <workItem from="1732691261426" duration="4409000" />
+      <workItem from="1732695710491" duration="4524000" />
+      <workItem from="1732730665468" duration="351000" />
+      <workItem from="1732791938394" duration="1965000" />
+      <workItem from="1732864528284" duration="2172000" />
+      <workItem from="1732871770420" duration="22000" />
+      <workItem from="1733075370597" duration="6621000" />
+      <workItem from="1733344216141" duration="683000" />
+      <workItem from="1733385701698" duration="12000" />
+      <workItem from="1734004156888" duration="120000" />
+      <workItem from="1734076177772" duration="30000" />
+      <workItem from="1734704571583" duration="10125000" />
+      <workItem from="1734760878778" duration="4028000" />
+      <workItem from="1734765088574" duration="8010000" />
+      <workItem from="1734777066471" duration="5824000" />
+      <workItem from="1734973456937" duration="4035000" />
+      <workItem from="1734980391531" duration="12662000" />
+      <workItem from="1735022446566" duration="905000" />
+      <workItem from="1735023713602" duration="4187000" />
+      <workItem from="1736190268211" duration="34000" />
+      <workItem from="1736445793698" duration="1755000" />
+      <workItem from="1736492556677" duration="1361000" />
+      <workItem from="1736791099985" duration="25000" />
+      <workItem from="1736877794688" duration="1141000" />
+      <workItem from="1736879011494" duration="1862000" />
+      <workItem from="1736969870064" duration="12644000" />
+      <workItem from="1737056379660" duration="1367000" />
+      <workItem from="1737101652824" duration="375000" />
+      <workItem from="1737386441291" duration="22000" />
+      <workItem from="1737896171822" duration="1286000" />
+      <workItem from="1737900066842" duration="2672000" />
+      <workItem from="1737983049208" duration="4106000" />
     </task>
     <task id="LOCAL-00001" summary="hui 2">
       <option name="closed" value="true" />
@@ -274,7 +330,63 @@
       <option name="project" value="LOCAL" />
       <updated>1731260999686</updated>
     </task>
-    <option name="localTasksCounter" value="5" />
+    <task id="LOCAL-00005" summary="added compute features function">
+      <option name="closed" value="true" />
+      <created>1732791976421</created>
+      <option name="number" value="00005" />
+      <option name="presentableId" value="LOCAL-00005" />
+      <option name="project" value="LOCAL" />
+      <updated>1732791976421</updated>
+    </task>
+    <task id="LOCAL-00006" summary="added attachment of target - asset returns in time_offset timedelta">
+      <option name="closed" value="true" />
+      <created>1732793147523</created>
+      <option name="number" value="00006" />
+      <option name="presentableId" value="LOCAL-00006" />
+      <option name="project" value="LOCAL" />
+      <updated>1732793147523</updated>
+    </task>
+    <task id="LOCAL-00007" summary="added target attachment">
+      <option name="closed" value="true" />
+      <created>1734004193215</created>
+      <option name="number" value="00007" />
+      <option name="presentableId" value="LOCAL-00007" />
+      <option name="project" value="LOCAL" />
+      <updated>1734004193215</updated>
+    </task>
+    <task id="LOCAL-00008" summary="added target attachment">
+      <option name="closed" value="true" />
+      <created>1734765131108</created>
+      <option name="number" value="00008" />
+      <option name="presentableId" value="LOCAL-00008" />
+      <option name="project" value="LOCAL" />
+      <updated>1734765131108</updated>
+    </task>
+    <task id="LOCAL-00009" summary="fixed memory overflow for multiple processes spawned">
+      <option name="closed" value="true" />
+      <created>1734770755454</created>
+      <option name="number" value="00009" />
+      <option name="presentableId" value="LOCAL-00009" />
+      <option name="project" value="LOCAL" />
+      <updated>1734770755454</updated>
+    </task>
+    <task id="LOCAL-00010" summary="added main notebook with results">
+      <option name="closed" value="true" />
+      <created>1735021737020</created>
+      <option name="number" value="00010" />
+      <option name="presentableId" value="LOCAL-00010" />
+      <option name="project" value="LOCAL" />
+      <updated>1735021737021</updated>
+    </task>
+    <task id="LOCAL-00011" summary="updated notebook">
+      <option name="closed" value="true" />
+      <created>1735028383489</created>
+      <option name="number" value="00011" />
+      <option name="presentableId" value="LOCAL-00011" />
+      <option name="project" value="LOCAL" />
+      <updated>1735028383489</updated>
+    </task>
+    <option name="localTasksCounter" value="12" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -305,12 +417,22 @@
     <MESSAGE value="removed junk files" />
     <MESSAGE value="added smth" />
     <MESSAGE value="added partitioning with pyarrow backend" />
-    <option name="LAST_COMMIT_MESSAGE" value="added partitioning with pyarrow backend" />
+    <MESSAGE value="added compute features function" />
+    <MESSAGE value="added attachment of target - asset returns in time_offset timedelta" />
+    <MESSAGE value="added target attachment" />
+    <MESSAGE value="fixed memory overflow for multiple processes spawned" />
+    <MESSAGE value="added main notebook with results" />
+    <MESSAGE value="updated notebook" />
+    <option name="LAST_COMMIT_MESSAGE" value="updated notebook" />
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
-    <SUITE FILE_PATH="coverage/microstructure_price_prediction$transform_to_parquet.coverage" NAME="transform_to_parquet Coverage Results" MODIFIED="1731786306225" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/preprocessing" />
-    <SUITE FILE_PATH="coverage/microstructure_price_prediction$run__1_.coverage" NAME="run (1) Coverage Results" MODIFIED="1731786486984" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/preprocessing" />
+    <SUITE FILE_PATH="coverage/microstructure_price_prediction$transform_to_parquet.coverage" NAME="transform_to_parquet Coverage Results" MODIFIED="1737985501199" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/preprocessing" />
+    <SUITE FILE_PATH="coverage/microstructure_price_prediction$run__1_.coverage" NAME="run (1) Coverage Results" MODIFIED="1737986882148" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/preprocessing" />
+    <SUITE FILE_PATH="coverage/microstructure_price_prediction$time_utils.coverage" NAME="time_utils Coverage Results" MODIFIED="1733077901838" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/core" />
     <SUITE FILE_PATH="coverage/microstructure_price_prediction$crawler.coverage" NAME="crawler Coverage Results" MODIFIED="1731250011441" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/data_collection/datavision" />
-    <SUITE FILE_PATH="coverage/microstructure_price_prediction$run.coverage" NAME="run Coverage Results" MODIFIED="1731786228824" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/data_collection/datavision" />
+    <SUITE FILE_PATH="coverage/microstructure_price_prediction$microstructure_pipeline.coverage" NAME="microstructure_pipeline Coverage Results" MODIFIED="1737056548415" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/preprocessing" />
+    <SUITE FILE_PATH="coverage/microstructure_price_prediction$run.coverage" NAME="run Coverage Results" MODIFIED="1737984680043" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/data_collection/datavision" />
+    <SUITE FILE_PATH="coverage/microstructure_price_prediction$feature_pipeline.coverage" NAME="feature_pipeline Coverage Results" MODIFIED="1732697723691" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/core" />
+    <SUITE FILE_PATH="coverage/microstructure_price_prediction$parse_klines.coverage" NAME="parse_klines Coverage Results" MODIFIED="1737983343735" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="false" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/src/data_collection/datavision" />
   </component>
 </project>

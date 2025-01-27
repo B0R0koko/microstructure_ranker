@@ -12,12 +12,14 @@ from tqdm import tqdm
 from core.currency import CurrencyPair
 from core.time_utils import Bounds, TimeOffset
 
+EXCLUDED_SYMBOLS: set[str] = {"BTC-USDT", "ETH-USDT"}
+
 
 class FeaturePipeline(ABC):
 
     def __init__(self, hive_dir: Path):
         self.hive_dir: Path = hive_dir
-        self.return_timedelta: TimeOffset = TimeOffset.MINUTE
+        self.return_timedelta: TimeOffset = TimeOffset.HOUR
 
     def _get_currency_pairs_cross_section(self, bounds: Bounds) -> List[CurrencyPair]:
         """
@@ -27,7 +29,7 @@ class FeaturePipeline(ABC):
         df_hive: pl.LazyFrame = pl.scan_parquet(self.hive_dir, hive_partitioning=True)
         # Extract dates of start_time and end_time
 
-        unique_symbols: List[str] = (
+        unique_symbols: set[str] = set(
             df_hive
             .filter(
                 pl.col("date").is_between(lower_bound=bounds.start_inclusive.date(),
@@ -37,7 +39,7 @@ class FeaturePipeline(ABC):
             .select("symbol").unique().collect()["symbol"].to_list()
         )
 
-        return [CurrencyPair.from_string(symbol=symbol) for symbol in unique_symbols]
+        return [CurrencyPair.from_string(symbol=symbol) for symbol in set(unique_symbols) - EXCLUDED_SYMBOLS]
 
     def load_currency_pair_dataframe(self, currency_pair: CurrencyPair, bounds: Bounds) -> pl.DataFrame:
         """Load data for a given CurrencyPair with specific time interval [start_time, end_time + return_timedelta)"""
@@ -107,7 +109,7 @@ class FeaturePipeline(ABC):
 
         with (
             tqdm(total=len(cross_section_bounds), desc="Computing cross-sections with multiprocessing: ") as pbar,
-            Pool(processes=10) as pool,
+            Pool(processes=3) as pool,
         ):
             promises: List[AsyncResult] = []
 
