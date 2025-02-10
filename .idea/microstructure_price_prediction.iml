@@ -5,7 +5,7 @@
       <sourceFolder url="file://$MODULE_DIR$/src" isTestSource="false" />
       <sourceFolder url="file://$MODULE_DIR$/test" isTestSource="true" />
     </content>
-    <orderEntry type="jdk" jdkName="Poetry (microstructure_price_prediction)" jdkType="Python SDK" />
+    <orderEntry type="jdk" jdkName="Poetry (microstructure_price_prediction) (8)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="PackageRequirementsSettings">

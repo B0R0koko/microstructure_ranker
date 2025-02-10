@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import polars as pl
+import pandas as pd
 
 from core.columns import *
 from core.currency import CurrencyPair
@@ -20,21 +20,18 @@ class Trades2HiveUploader(Uploader2Hive):
             include_columns=_INCLUDE_COLUMNS
         )
 
-    def preprocess_batched_data(self, df: pl.DataFrame, currency_pair: CurrencyPair) -> pl.DataFrame:
-        df = df.with_columns(
-            pl.lit(currency_pair.name).alias(SYMBOL),
-            pl.col(TRADE_TIME).cast(pl.Datetime(time_unit="ms")).alias(TRADE_TIME)
-        )
+    def preprocess_batched_data(self, df: pd.DataFrame, currency_pair: CurrencyPair) -> pd.DataFrame:
+        df[TRADE_TIME] = pd.to_datetime(df[TRADE_TIME], unit="ms", errors="coerce")
+        df[SYMBOL] = currency_pair.name
         # Create date column from TRADE_TIME
-        df = df.with_columns(pl.col(TRADE_TIME).dt.date().alias("date"))
+        df["date"] = df[TRADE_TIME].dt.date
         return df
 
-    def save_to_hive(self, df: pl.DataFrame) -> None:
-        df.write_parquet(
+    def save_to_hive(self, df: pd.DataFrame) -> None:
+        df.to_parquet(
             self.output_dir,
-            use_pyarrow=True,
-            pyarrow_options={
-                "partition_cols": ["date", SYMBOL],  # define set of filters here
-                "existing_data_behavior": "overwrite_or_ignore",
-            }
+            engine='pyarrow',
+            compression="lz4",
+            partition_cols=["date", "symbol"],
+            existing_data_behavior="delete_matching"
         )

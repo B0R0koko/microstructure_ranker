@@ -7,7 +7,16 @@ from core.currency import CurrencyPair
 from preprocessing.uploader_to_hive import Uploader2Hive
 
 _INCLUDE_COLUMNS: List[str] = [
-    OPEN_TIME, OPEN_PRICE, HIGH_PRICE, LOW_PRICE, CLOSE_PRICE, VOLUME, CLOSE_TIME, NUM_TRADES
+    OPEN_TIME,
+    OPEN_PRICE,
+    HIGH_PRICE,
+    LOW_PRICE,
+    CLOSE_PRICE,
+    VOLUME,
+    QUOTE_ASSET_VOLUME,
+    TAKER_BUY_QUOTE_ASSET_VOLUME,
+    CLOSE_TIME,
+    NUM_TRADES
 ]
 
 

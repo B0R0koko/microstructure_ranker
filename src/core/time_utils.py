@@ -82,6 +82,14 @@ class Bounds:
             end_exclusive=end_of_the_day(day=end_exclusive - timedelta(days=1)),
         )
 
+    @property
+    def day0(self) -> date:
+        return self.start_inclusive.date()
+
+    @property
+    def day1(self) -> date:
+        return self.end_exclusive.date()
+
     def __str__(self) -> str:
         return f"Bounds: {self.start_inclusive} - {self.end_exclusive}"
 

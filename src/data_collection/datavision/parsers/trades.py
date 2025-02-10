@@ -3,7 +3,7 @@ from typing import List, Optional, Dict
 from urllib.parse import urlencode
 
 from core.currency import CurrencyPair
-from core.parser_enums import CollectMode, KlineInterval
+from core.parser_enums import CollectMode
 from core.time_utils import Bounds
 from data_collection.datavision.parser import DataParser, BINANCE_S3
 
@@ -17,7 +17,6 @@ class TradeParser(DataParser):
             bounds: Bounds,
             collect_mode: CollectMode,
             output_dir: Path,
-            kline_interval: KlineInterval
     ):
         super().__init__(
             currency_pairs=currency_pairs,
@@ -25,7 +24,6 @@ class TradeParser(DataParser):
             collect_mode=collect_mode,
             output_dir=output_dir
         )
-        self.kline_interval: KlineInterval = kline_interval
 
     def get_currency_url(self, currency_pair: CurrencyPair, marker: Optional[str] = None) -> str:
         params: Dict[str, str] = {
