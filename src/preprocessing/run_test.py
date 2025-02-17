@@ -1,23 +1,26 @@
-from datetime import datetime
+from datetime import date
 
 import polars as pl
 
-from core.columns import OPEN_TIME
+from core.columns import TRADE_TIME, SYMBOL
 from core.currency import CurrencyPair
+from core.time_utils import Bounds
 
 
 def main():
-    df: pl.LazyFrame = pl.scan_parquet("D:/data/transformed/klines/1m")
+    df: pl.LazyFrame = pl.scan_parquet("D:/data/transformed/trades")
     currency_pair: CurrencyPair = CurrencyPair(base="ADA", term="USDT")
-    start_time: datetime = datetime(2024, 11, 20, 10)
-    end_time: datetime = datetime(2024, 11, 20, 11)
+
+    start_date: date = date(2024, 11, 1)
+    end_date: date = date(2024, 11, 30)
+    bounds: Bounds = Bounds.for_days(start_date, end_date)
 
     df = df.filter(
-        (pl.col("date").is_between(lower_bound=start_time.date(), upper_bound=end_time.date())) &
-        (pl.col(OPEN_TIME).is_between(lower_bound=start_time, upper_bound=end_time))
+        (pl.col("date").is_between(bounds.day0, bounds.day1)) &
+        (pl.col(SYMBOL) == currency_pair.name)
     )
 
-    print(df.sort(by=OPEN_TIME).head().collect())
+    print(df.select(pl.len()).collect())
 
 
 if __name__ == '__main__':

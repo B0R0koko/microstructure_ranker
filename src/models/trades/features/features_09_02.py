@@ -43,25 +43,37 @@ def aggregate_ticks_into_trades(df_currency_pair: pl.LazyFrame) -> pl.LazyFrame:
     return df_trades
 
 
-def select_features(df_trades: pl.LazyFrame, bounds: Bounds, offset: TimeOffset) -> Any:
-    return (
+def select_features(df_trades: pl.LazyFrame, bounds: Bounds, offset: TimeOffset) -> Dict[str, float]:
+    features_fetched: Dict[str, List[float]] = (
         df_trades
         .filter(pl.col("trade_time").is_between(bounds.end_exclusive - offset.value, bounds.end_exclusive))
         .select(
-            (pl.col("quote_sign").sum() / pl.col("quote_abs").sum()).alias(f"volume_imbalance_{offset.name}"),
+            (
+                (pl.col("quote_sign").sum() / pl.col("quote_abs").sum())
+                .alias(f"volume_imbalance_{offset.name}")
+            ),
             (
                 (pl.col("quote_slippage_sign").sum() / pl.col("quote_slippage_abs").sum())
                 .alias(f"slippage_imbalance_{offset.name}")
             ),
-            (pl.col("is_long").sum() / pl.len()).alias(f"share_of_long_trades_{offset.name}"),
-            (pl.col("price_last").last() / pl.col("price_first").first()).log().alias(f"log_return_{offset.name}"),
+            (
+                (pl.col("is_long").sum() / pl.len())
+                .alias(f"share_of_long_trades_{offset.name}")
+            ),
+            (
+                (pl.col("price_last").last() / pl.col("price_first").first()).log()
+                .alias(f"log_return_{offset.name}")
+            ),
             (
                 (1 + pl.len() / (pl.col("quote_abs") / pl.col("quote_abs").min()).log().sum())
                 .alias(f"mle_alpha_powerlaw_{offset.name}")
             )
         )
         .collect()
+        .to_dict(as_series=False)
     )
+
+    return {key: val[0] for key, val in features_fetched.items()}
 
 
 def compute_features(df_currency_pair: pl.LazyFrame, currency_pair: CurrencyPair, bounds: Bounds) -> Dict[str, Any]:
@@ -90,7 +102,10 @@ def compute_features(df_currency_pair: pl.LazyFrame, currency_pair: CurrencyPair
         TimeOffset.FOUR_HOURS
     ]
 
-    for offset in desired_offsets:
-        select_features(df_trades=df_trades, bounds=bounds, offset=offset)
+    all_features: Dict[str, Any] = {"currency_pair": currency_pair.binance_name}
 
-    return {"hello": 2}
+    for offset in desired_offsets:
+        features: Dict[str, float] = select_features(df_trades=df_trades, bounds=bounds, offset=offset)
+        all_features.update(features)
+
+    return all_features

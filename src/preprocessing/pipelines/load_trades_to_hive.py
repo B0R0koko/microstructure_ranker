@@ -11,10 +11,9 @@ _INCLUDE_COLUMNS: List[str] = [PRICE, QUANTITY, TRADE_TIME, IS_BUYER_MAKER]
 
 class Trades2HiveUploader(Uploader2Hive):
 
-    def __init__(self, zipped_data_dir: Path, temp_dir: Path, output_dir: Path):
+    def __init__(self, zipped_data_dir: Path, output_dir: Path):
         super().__init__(
             zipped_data_dir=zipped_data_dir,
-            temp_dir=temp_dir,
             output_dir=output_dir,
             column_names=BINANCE_TRADE_COLS,
             include_columns=_INCLUDE_COLUMNS
@@ -27,11 +26,12 @@ class Trades2HiveUploader(Uploader2Hive):
         df["date"] = df[TRADE_TIME].dt.date
         return df
 
-    def save_to_hive(self, df: pd.DataFrame) -> None:
+    def save_batch_to_hive(self, df: pd.DataFrame) -> None:
         df.to_parquet(
             self.output_dir,
-            engine='pyarrow',
-            compression="lz4",
+            engine="pyarrow",
+            compression="gzip",
             partition_cols=["date", "symbol"],
-            existing_data_behavior="delete_matching"
+            existing_data_behavior="overwrite_or_ignore",
+            basename_template="data_chunk_{i}"
         )

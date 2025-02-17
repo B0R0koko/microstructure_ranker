@@ -23,13 +23,11 @@ class Uploader2Hive(ABC):
     def __init__(
             self,
             zipped_data_dir: Path,
-            temp_dir: Path,
             output_dir: Path,
             column_names: List[str],
             include_columns: List[str]
     ):
         self.zipped_data_dir: Path = zipped_data_dir
-        self.temp_dir: Path = temp_dir
         self.output_dir: Path = output_dir
         self.column_names: List[str] = column_names
         self.include_columns: List[str] = include_columns
@@ -41,7 +39,7 @@ class Uploader2Hive(ABC):
         """Preprocess data read from batched csv reader"""
 
     @abstractmethod
-    def save_to_hive(self, df: pl.DataFrame) -> None:
+    def save_batch_to_hive(self, df: pl.DataFrame) -> None:
         """Save batched data to Hive structure. Define the partitioning here"""
 
     def _parse_collected_currency_pairs(self) -> List[CurrencyPair]:
@@ -51,7 +49,19 @@ class Uploader2Hive(ABC):
             currency_pairs.append(CurrencyPair.from_string(symbol=folder))
         return currency_pairs
 
-    def _save_to_pyarrow_hive(
+    def save_currency_pair_to_hive(self, currency_pair: CurrencyPair) -> None:
+        # Get the name of directory where zipped csv files for a given CurrencyPair are stored
+        currency_pair_folder: Path = self.zipped_data_dir.joinpath(currency_pair.name)
+        # Iterate over each zip file store in currency_pair_folder
+        for file in os.listdir(currency_pair_folder):
+            zip_file: Path = (
+                self.zipped_data_dir
+                .joinpath(currency_pair.name)
+                .joinpath(file)
+            )
+            self.save_to_pyarrow_hive(zipped_csv_file_path=zip_file, currency_pair=currency_pair)
+
+    def save_to_pyarrow_hive(
             self, zipped_csv_file_path: Path, currency_pair: CurrencyPair
     ) -> None:
         """
@@ -71,19 +81,7 @@ class Uploader2Hive(ABC):
         for batch_id, batch in enumerate(csv_reader):
             # Example processing: Display the first few rows
             self.preprocess_batched_data(df=batch, currency_pair=currency_pair)
-            self.save_to_hive(df=batch)
-
-    def save_currency_pair_to_hive(self, currency_pair: CurrencyPair) -> None:
-        # Get the name of directory where zipped csv files for a given CurrencyPair are stored
-        currency_pair_folder: Path = self.zipped_data_dir.joinpath(currency_pair.name)
-        # Iterate over each zip file store in currency_pair_folder
-        for file in os.listdir(currency_pair_folder):
-            zip_file: Path = (
-                self.zipped_data_dir
-                .joinpath(currency_pair.name)
-                .joinpath(file)
-            )
-            self._save_to_pyarrow_hive(zipped_csv_file_path=zip_file, currency_pair=currency_pair)
+            self.save_batch_to_hive(df=batch)
 
     def run(self) -> None:
         """
@@ -101,10 +99,10 @@ class Uploader2Hive(ABC):
             currency_pair: CurrencyPair
             self.save_currency_pair_to_hive(currency_pair=currency_pair)
 
-    def run_multiprocessing(self) -> None:
+    def run_multiprocessing(self, processes: int = 10) -> None:
         with (
             tqdm(total=len(self.currency_pairs), desc="Saving zipped csv files to HiveDataset: ") as pbar,
-            Pool(processes=10) as pool,
+            Pool(processes=processes) as pool,
         ):
             promises: List[AsyncResult] = []
 

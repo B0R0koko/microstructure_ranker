@@ -1,3 +1,4 @@
+import gc
 from datetime import timedelta, date, datetime
 from functools import partial
 from multiprocessing import Pool
@@ -14,6 +15,7 @@ from core.time_utils import Bounds, TimeOffset
 from models.trades.features.features_27_11 import compute_features
 
 EXCLUDED_SYMBOLS: set[str] = {"BTC-USDT", "ETH-USDT"}
+USE_COLS: List[str] = ["price", "quantity", "trade_time", "is_buyer_maker"]
 
 
 def compute_features_for_currency_pair(
@@ -54,7 +56,6 @@ class TradesPipeline:
 
     def load_data_for_currency_pair(self, currency_pair: CurrencyPair, bounds: Bounds) -> pl.DataFrame:
         """Load data for a given CurrencyPair with specific time interval [start_time, end_time + return_timedelta)"""
-
         df_currency_pair: pl.LazyFrame = self._hive.filter(
             (pl.col(SYMBOL) == currency_pair.name) &
             # Load data by filtering by both hive folder structure and columns inside each parquet file
@@ -62,7 +63,7 @@ class TradesPipeline:
             (pl.col(TRADE_TIME).is_between(bounds.start_inclusive, bounds.end_exclusive))
         )
 
-        return df_currency_pair.collect()
+        return df_currency_pair.select(USE_COLS).collect()
 
     def attach_target_for_currency_pair(
             self, currency_pair: CurrencyPair, bounds: Bounds, prediction_offset: timedelta
@@ -107,6 +108,10 @@ class TradesPipeline:
                 bounds=bounds,
                 prediction_offset=TimeOffset.HOUR.value
             )
+            # Delete collected data from ram to perhaps free up some ram as we get a lot of MemoryErrors
+            del df_currency_pair
+            gc.collect()
+
             cross_section_features.append(currency_pair_features)
 
         df_cross_section: pl.DataFrame = pl.DataFrame(cross_section_features)
@@ -142,7 +147,7 @@ class TradesPipeline:
 
 
 def _test_main():
-    hive_dir: Path = Path("D:/data/transformed_data")
+    hive_dir: Path = Path("D:/data/transformed/trades")
 
     start_date: date = date(2024, 11, 1)
     end_date: date = date(2024, 11, 30)
@@ -154,11 +159,9 @@ def _test_main():
     cross_section_bounds: List[Bounds] = bounds.generate_overlapping_bounds(step=step, interval=interval)
 
     pipeline: TradesPipeline = TradesPipeline(hive_dir=hive_dir)
-    df_features: pl.DataFrame = pipeline.load_multiple_cross_sections(
-        cross_section_bounds=cross_section_bounds
-    )
+    df_features: pl.DataFrame = pipeline.load_multiple_cross_sections(cross_section_bounds=cross_section_bounds)
 
-    df_features.to_pandas().to_parquet("D:/data/features/features_09-02-2025.parquet", index=False)
+    df_features.to_pandas().to_parquet("D:/data/features/features_10-02-2025.parquet", index=False)
 
 
 if __name__ == "__main__":
