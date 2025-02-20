@@ -72,7 +72,14 @@ class Bounds:
     end_exclusive: datetime
 
     @classmethod
-    def for_days(cls, start_inclusive: date, end_exclusive: date):
+    def from_datetime_str(cls, start_inclusive: str, end_exclusive: str) -> "Bounds":
+        return cls(
+            start_inclusive=datetime.strptime(start_inclusive, "%Y-%m-%d %H:%M:%S"),
+            end_exclusive=datetime.strptime(end_exclusive, "%Y-%m-%d %H:%M:%S"),
+        )
+
+    @classmethod
+    def for_days(cls, start_inclusive: date, end_exclusive: date) -> "Bounds":
         """
         For instance if we pass start_inclusive = date(2024, 11, 1) and end_exclusive = date(2024, 12, 1),
         Final Bounds will have the following datetime (2024-11-01 0:00:00, 2024-11-30 23:59:59)
