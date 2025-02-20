@@ -1,10 +1,10 @@
 from pathlib import Path
 
 import pandas as pd
+from preprocessing.uploader_to_hive import Uploader2Hive
 
 from core.columns import *
 from core.currency import CurrencyPair
-from preprocessing.uploader_to_hive import Uploader2Hive
 
 _INCLUDE_COLUMNS: List[str] = [
     OPEN_TIME,

@@ -1,7 +1,7 @@
 import gc
 from datetime import timedelta, date, datetime
 from functools import partial
-from multiprocessing import Pool
+from multiprocessing import Pool, freeze_support, RLock
 from multiprocessing.pool import AsyncResult
 from pathlib import Path
 from typing import Dict, Any, List
@@ -14,7 +14,6 @@ from core.currency import CurrencyPair
 from core.time_utils import Bounds, TimeOffset
 from models.trades.features.features_27_11 import compute_features
 
-EXCLUDED_SYMBOLS: set[str] = {"BTC-USDT", "ETH-USDT"}
 USE_COLS: List[str] = ["price", "quantity", "trade_time", "is_buyer_maker"]
 
 
@@ -34,8 +33,10 @@ def compute_features_for_currency_pair(
 class TradesPipeline:
     """Define first feature pipeline here. Make sure to implement all methods from abstract parent class"""
 
-    def __init__(self, hive_dir: Path):
+    def __init__(self, hive_dir: Path, output_features_path: Path, num_processes: int = 5):
         self._hive = pl.scan_parquet(source=hive_dir, hive_partitioning=True)
+        self.output_features_path: Path = output_features_path
+        self.num_processes: int = num_processes
 
     def get_currency_pairs_for_cross_section(self, bounds: Bounds) -> List[CurrencyPair]:
         """
@@ -52,7 +53,7 @@ class TradesPipeline:
             .select(SYMBOL).unique().collect()[SYMBOL].to_list()
         )
 
-        return [CurrencyPair.from_string(symbol=symbol) for symbol in set(unique_symbols) - EXCLUDED_SYMBOLS]
+        return [CurrencyPair.from_string(symbol=symbol) for symbol in set(unique_symbols)]
 
     def load_data_for_currency_pair(self, currency_pair: CurrencyPair, bounds: Bounds) -> pl.DataFrame:
         """Load data for a given CurrencyPair with specific time interval [start_time, end_time + return_timedelta)"""
@@ -85,7 +86,7 @@ class TradesPipeline:
 
         return currency_pair_log_return
 
-    def load_cross_section(self, bounds: Bounds) -> pl.DataFrame:
+    def load_cross_section(self, bounds: Bounds, _process_id: int) -> pl.DataFrame:
         """
         This function runs self.compute_features_for_currency_pair for each of the currency_pair available within
         a given range of time defined by passed in start_time and end_time. Returns pl.DataFrame with all features
@@ -93,6 +94,13 @@ class TradesPipeline:
         """
         currency_pairs: List[CurrencyPair] = self.get_currency_pairs_for_cross_section(bounds=bounds)
         cross_section_features: List[Dict[str, Any]] = []
+
+        pbar = tqdm(
+            total=len(currency_pairs),
+            desc=f"#{_process_id}: {str(bounds)}",
+            position=2 + _process_id % self.num_processes,
+            leave=False
+        )
 
         for currency_pair in currency_pairs:
             # Load and collect pl.DataFrame for current CurrencyPair, read to RAM no avoid calling collect multiple times
@@ -108,11 +116,13 @@ class TradesPipeline:
                 bounds=bounds,
                 prediction_offset=TimeOffset.HOUR.value
             )
+            cross_section_features.append(currency_pair_features)
+
             # Delete collected data from ram to perhaps free up some ram as we get a lot of MemoryErrors
             del df_currency_pair
             gc.collect()
 
-            cross_section_features.append(currency_pair_features)
+            pbar.update(1)
 
         df_cross_section: pl.DataFrame = pl.DataFrame(cross_section_features)
         df_cross_section = df_cross_section.with_columns(
@@ -121,47 +131,55 @@ class TradesPipeline:
         )
         return df_cross_section
 
-    # Parallelize this function to be able to run at least using 10 processes
-    def load_multiple_cross_sections(self, cross_section_bounds: List[Bounds]) -> pl.DataFrame:
-        dfs: List[pl.DataFrame] = []
+    def write_features(self, df: pl.DataFrame) -> None:
+        """Output features to parquet file in append mode"""
+        df.to_pandas().to_parquet(
+            self.output_features_path, engine="fastparquet",
+            append=self.output_features_path.exists()  # if the file exists we will append to it
+        )
 
-        with (
-            tqdm(total=len(cross_section_bounds), desc="Computing cross-sections with multiprocessing: ") as pbar,
-            Pool(processes=5) as pool,
-        ):
+    # Parallelize this function to be able to run at least using multiple processes
+    # Added progress bars with the help of
+    # https://github.com/tqdm/tqdm?tab=readme-ov-file#nested-progress-bars
+    def load_multiple_cross_sections(self, cross_section_bounds: List[Bounds]) -> None:
+
+        freeze_support()  # for Windows support
+        tqdm.set_lock(RLock())  # for managing output contention
+
+        with Pool(processes=self.num_processes, initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),)) as pool:
             promises: List[AsyncResult] = []
 
-            for bounds in cross_section_bounds:
+            for i, bounds in enumerate(cross_section_bounds):
                 promise: AsyncResult = pool.apply_async(
-                    partial(self.load_cross_section, bounds=bounds)
+                    partial(self.load_cross_section, bounds=bounds, _process_id=i),
                 )
                 promises.append(promise)
 
-            for promise in promises:
+            for promise in tqdm(promises, desc="Overall progress", total=len(cross_section_bounds), position=0):
                 df_cross_section: pl.DataFrame = promise.get()  # fetch output of self.load_cross_section from Future
-                dfs.append(df_cross_section)
+                self.write_features(df=df_cross_section)
 
-                pbar.update(1)
-
-        return pl.concat(dfs)
+                del df_cross_section
+                gc.collect()
 
 
 def _test_main():
     hive_dir: Path = Path("D:/data/transformed/trades")
+    output_features_path: Path = Path("D:/data/features/features_19-02-2025.parquet")
 
-    start_date: date = date(2024, 11, 1)
+    start_date: date = date(2024, 11, 8)
     end_date: date = date(2024, 11, 30)
     bounds: Bounds = Bounds.for_days(start_date, end_date)
 
     step: timedelta = timedelta(hours=1)
-    interval: timedelta = timedelta(hours=4)
+    interval: timedelta = timedelta(hours=12)
 
     cross_section_bounds: List[Bounds] = bounds.generate_overlapping_bounds(step=step, interval=interval)
 
-    pipeline: TradesPipeline = TradesPipeline(hive_dir=hive_dir)
-    df_features: pl.DataFrame = pipeline.load_multiple_cross_sections(cross_section_bounds=cross_section_bounds)
-
-    df_features.to_pandas().to_parquet("D:/data/features/features_10-02-2025.parquet", index=False)
+    pipeline: TradesPipeline = TradesPipeline(
+        hive_dir=hive_dir, output_features_path=output_features_path, num_processes=20
+    )
+    pipeline.load_multiple_cross_sections(cross_section_bounds=cross_section_bounds)
 
 
 if __name__ == "__main__":

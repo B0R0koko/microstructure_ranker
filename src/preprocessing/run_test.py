@@ -2,7 +2,7 @@ from datetime import date
 
 import polars as pl
 
-from core.columns import TRADE_TIME, SYMBOL
+from core.columns import SYMBOL
 from core.currency import CurrencyPair
 from core.time_utils import Bounds
 

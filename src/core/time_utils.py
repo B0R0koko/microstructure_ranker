@@ -121,6 +121,7 @@ class TimeOffset(Enum):
     HOUR: timedelta = timedelta(hours=1)
     TWO_HOURS: timedelta = timedelta(hours=2)
     FOUR_HOURS: timedelta = timedelta(hours=4)
+    TWELVE_HOURS: timedelta = timedelta(hours=12)
 
 
 if __name__ == "__main__":

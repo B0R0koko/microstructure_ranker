@@ -2,13 +2,13 @@ from datetime import date
 from pathlib import Path
 from typing import List
 
+from data_collection.datavision.parsers.trades import TradeParser
+from data_collection.datavision.settings import SETTINGS
 from scrapy.crawler import CrawlerProcess
 
 from core.currency import collect_all_currency_pairs, CurrencyPair
 from core.parser_enums import CollectMode
 from core.time_utils import Bounds
-from data_collection.datavision.parsers.trades import TradeParser
-from data_collection.datavision.settings import SETTINGS
 
 
 def main():

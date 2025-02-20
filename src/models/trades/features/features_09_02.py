@@ -2,8 +2,8 @@ from typing import Dict, Any, List
 
 import polars as pl
 
-from core.currency import CurrencyPair
-from core.time_utils import Bounds, TimeOffset
+from analysis.core.currency import CurrencyPair
+from analysis.core.time_utils import Bounds, TimeOffset
 
 
 def compute_slippage(df_trades: pl.LazyFrame) -> pl.LazyFrame:
