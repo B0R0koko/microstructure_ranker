@@ -9,10 +9,11 @@ from pathlib import Path
 from typing import Dict, Any, List, Tuple
 
 import polars as pl
+import psutil
 from tqdm import tqdm
 
 from core.columns import TRADE_TIME, SYMBOL, PRICE
-from core.currency import CurrencyPair
+from core.currency import CurrencyPair, get_cross_section_currencies
 from core.time_utils import Bounds, TimeOffset
 from models.trades.features.features_27_11 import compute_features
 
@@ -31,6 +32,18 @@ def compute_features_for_currency_pair(
         df_currency_pair=df_currency_pair, currency_pair=currency_pair, bounds=bounds
     )
     return features
+
+
+def get_ram_usage() -> float:
+    """Returns number of GBs of RAM the process is using"""
+    pid: int = os.getpid()
+    process: psutil.Process = psutil.Process(pid=pid)
+    return process.memory_info().rss / 1024 ** 3
+
+
+def get_process_pbar(task_id: str, bounds: Bounds) -> str:
+    ram_used: float = get_ram_usage()
+    return f"{task_id} - RAM: {ram_used:.3f}GBs - {str(bounds)}"
 
 
 class ProgressTracker:
@@ -53,7 +66,6 @@ class ProgressTracker:
 
     def complete(self, task_id: str) -> None:
         del self.task_map[task_id]
-        gc.collect()
 
         with open(self.progress_path, "w") as file:
             json.dump(self.task_map, file)  # type:ignore
@@ -65,30 +77,14 @@ class TradesPipeline:
     def __init__(
             self, hive_dir: Path, output_features_path: Path, warmup_start: bool = False, num_processes: int = 5
     ):
-        self._hive = pl.scan_parquet(source=hive_dir, hive_partitioning=True)
+        self._hive = pl.scan_parquet(source=hive_dir)
+        self.hive_dir: Path = hive_dir
         self.output_features_path: Path = output_features_path
         self.warmup_start: bool = warmup_start
         self.num_processes: int = num_processes
 
-    def get_currency_pairs_for_cross_section(self, bounds: Bounds) -> List[CurrencyPair]:
-        """
-        Returns a list of CurrencyPair for which there is data stored in self.hive_dir: Path for the
-        given time interval
-        """
-        # Extract dates of start_time and end_time
-        unique_symbols: set[str] = set(
-            self._hive
-            .filter(
-                pl.col("date").is_between(bounds.day0, bounds.day1) &
-                pl.col(TRADE_TIME).is_between(bounds.start_inclusive, bounds.end_exclusive)
-            )
-            .select(SYMBOL).unique().collect()[SYMBOL].to_list()
-        )
-
-        return [CurrencyPair.from_string(symbol=symbol) for symbol in set(unique_symbols)]
-
     def load_data_for_currency_pair(self, currency_pair: CurrencyPair, bounds: Bounds) -> pl.DataFrame:
-        """Load data for a given CurrencyPair with specific time interval [start_time, end_time + return_timedelta)"""
+        """Load data for a given CurrencyPair with specific time interval [start_time, end_time)"""
         df_currency_pair: pl.LazyFrame = self._hive.filter(
             (pl.col(SYMBOL) == currency_pair.name) &
             # Load data by filtering by both hive folder structure and columns inside each parquet file
@@ -124,17 +120,17 @@ class TradesPipeline:
         a given range of time defined by passed in start_time and end_time. Returns pl.DataFrame with all features
         attached as well as task_id
         """
-        currency_pairs: List[CurrencyPair] = self.get_currency_pairs_for_cross_section(bounds=bounds)
+        currency_pairs: List[CurrencyPair] = get_cross_section_currencies(hive_dir=self.hive_dir, bounds=bounds)
         cross_section_features: List[Dict[str, Any]] = []
 
         pbar = tqdm(
-            total=len(currency_pairs[:10]),
-            desc=f"{task_id}: {str(bounds)}",
+            total=len(currency_pairs),
+            desc=get_process_pbar(bounds=bounds, task_id=task_id),
             position=2 + position,
             leave=False
         )
 
-        for currency_pair in currency_pairs[:10]:
+        for currency_pair in currency_pairs:
             # Load and collect pl.DataFrame for current CurrencyPair, read to RAM no avoid calling collect multiple times
             df_currency_pair: pl.DataFrame = self.load_data_for_currency_pair(
                 currency_pair=currency_pair, bounds=bounds
@@ -144,9 +140,7 @@ class TradesPipeline:
                 currency_pair=currency_pair, df_currency_pair=df_currency_pair, bounds=bounds
             )
             currency_pair_features["log_return"] = self.attach_target_for_currency_pair(
-                currency_pair=currency_pair,
-                bounds=bounds,
-                prediction_offset=TimeOffset.HOUR.value
+                currency_pair=currency_pair, bounds=bounds, prediction_offset=TimeOffset.HOUR.value
             )
             cross_section_features.append(currency_pair_features)
 
@@ -155,8 +149,13 @@ class TradesPipeline:
             gc.collect()
 
             pbar.update(1)
+            pbar.set_description(desc=get_process_pbar(task_id=task_id, bounds=bounds))
 
         df_cross_section: pl.DataFrame = pl.DataFrame(cross_section_features)
+
+        del cross_section_features
+        gc.collect()
+
         df_cross_section = df_cross_section.with_columns(
             pl.lit(value=bounds.start_inclusive).alias("cross_section_start_time"),
             pl.lit(value=bounds.end_exclusive).alias("cross_section_end_time"),
@@ -198,39 +197,38 @@ class TradesPipeline:
         tqdm.set_lock(RLock())  # for managing output contention
 
         progress_tracker: ProgressTracker = self.get_process_tracker(cross_section_bounds=cross_section_bounds)
-        position: int = 0
 
-        with Pool(processes=self.num_processes, initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),)) as pool:
+        with Pool(processes=self.num_processes, initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),),
+                  maxtasksperchild=1) as pool:
             promises: List[AsyncResult] = []
 
-            for task_id, kwargs in progress_tracker.iterate():
+            for i, (task_id, kwargs) in enumerate(progress_tracker.iterate()):
                 bounds: Bounds = Bounds.from_datetime_str(
                     start_inclusive=kwargs["start_inclusive"], end_exclusive=kwargs["end_exclusive"]
                 )
                 promise: AsyncResult = pool.apply_async(
                     partial(
-                        self.load_cross_section, bounds=bounds, task_id=task_id, position=position % self.num_processes
+                        self.load_cross_section, bounds=bounds, task_id=task_id, position=i % self.num_processes
                     ),
                 )
-                position += 1
                 promises.append(promise)
 
-            for promise in tqdm(promises, desc="Overall progress", position=0):
-                task_id, df_cross_section = promise.get()  # fetch output of self.load_cross_section from Future
-                self.write_features(df=df_cross_section)
+        for promise in tqdm(promises, desc="Overall progress", position=0):
+            task_id, df_cross_section = promise.get()
+            self.write_features(df=df_cross_section)
 
-                del df_cross_section
-                gc.collect()
-                # Update ProgressTracker
-                progress_tracker.complete(task_id=task_id)
+            del df_cross_section, promise
+            gc.collect()
+            # Update ProgressTracker
+            progress_tracker.complete(task_id=task_id)
 
 
 def _test_main():
     hive_dir: Path = Path("D:/data/transformed/trades")
     output_features_path: Path = Path("D:/data/features/features_19-02-2025.parquet")
 
-    start_date: date = date(2024, 11, 8)
-    end_date: date = date(2024, 11, 30)
+    start_date: date = date(2024, 11, 1)
+    end_date: date = date(2024, 12, 30)
     bounds: Bounds = Bounds.for_days(start_date, end_date)
 
     step: timedelta = timedelta(hours=1)
@@ -239,7 +237,10 @@ def _test_main():
     cross_section_bounds: List[Bounds] = bounds.generate_overlapping_bounds(step=step, interval=interval)
 
     pipeline: TradesPipeline = TradesPipeline(
-        hive_dir=hive_dir, output_features_path=output_features_path, num_processes=20, warmup_start=False
+        hive_dir=hive_dir,
+        output_features_path=output_features_path,
+        num_processes=20,
+        warmup_start=True
     )
     pipeline.load_multiple_cross_sections(cross_section_bounds=cross_section_bounds)
 

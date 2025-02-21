@@ -116,6 +116,9 @@ class Bounds:
 
         return intervals
 
+    def contain_days(self, day: date) -> bool:
+        return self.day0 <= day <= self.day1
+
 
 class TimeOffset(Enum):
     FIVE_SECONDS: timedelta = timedelta(seconds=5)
