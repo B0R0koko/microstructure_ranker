@@ -72,7 +72,14 @@ class Bounds:
     end_exclusive: datetime
 
     @classmethod
-    def for_days(cls, start_inclusive: date, end_exclusive: date):
+    def from_datetime_str(cls, start_inclusive: str, end_exclusive: str) -> "Bounds":
+        return cls(
+            start_inclusive=datetime.strptime(start_inclusive, "%Y-%m-%d %H:%M:%S"),
+            end_exclusive=datetime.strptime(end_exclusive, "%Y-%m-%d %H:%M:%S"),
+        )
+
+    @classmethod
+    def for_days(cls, start_inclusive: date, end_exclusive: date) -> "Bounds":
         """
         For instance if we pass start_inclusive = date(2024, 11, 1) and end_exclusive = date(2024, 12, 1),
         Final Bounds will have the following datetime (2024-11-01 0:00:00, 2024-11-30 23:59:59)
@@ -81,6 +88,14 @@ class Bounds:
             start_inclusive=start_of_the_day(day=start_inclusive),
             end_exclusive=end_of_the_day(day=end_exclusive - timedelta(days=1)),
         )
+
+    @property
+    def day0(self) -> date:
+        return self.start_inclusive.date()
+
+    @property
+    def day1(self) -> date:
+        return self.end_exclusive.date()
 
     def __str__(self) -> str:
         return f"Bounds: {self.start_inclusive} - {self.end_exclusive}"
@@ -101,6 +116,16 @@ class Bounds:
 
         return intervals
 
+    def contain_days(self, day: date) -> bool:
+        return self.day0 <= day <= self.day1
+
+    def create_offset_bounds(self, time_offset: "TimeOffset") -> "Bounds":
+        """Returns Bounds for the interval which is used to compute target"""
+        return Bounds(
+            start_inclusive=self.end_exclusive,
+            end_exclusive=self.end_exclusive + time_offset.value,
+        )
+
 
 class TimeOffset(Enum):
     FIVE_SECONDS: timedelta = timedelta(seconds=5)
@@ -113,6 +138,7 @@ class TimeOffset(Enum):
     HOUR: timedelta = timedelta(hours=1)
     TWO_HOURS: timedelta = timedelta(hours=2)
     FOUR_HOURS: timedelta = timedelta(hours=4)
+    TWELVE_HOURS: timedelta = timedelta(hours=12)
 
 
 if __name__ == "__main__":

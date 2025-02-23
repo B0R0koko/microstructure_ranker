@@ -1,16 +1,15 @@
 from pathlib import Path
 
-from preprocessing.pipelines.load_klines_to_hive import Klines2HiveUploader
+from preprocessing.pipelines.load_trades_to_hive import Trades2HiveUploader
 
 
 def main():
-    hive_uploader = Klines2HiveUploader(
-        zipped_data_dir=Path("D:/data/zipped_data/1m"),
-        temp_dir=Path("D:/data/temp"),
-        output_dir=Path("D:/data/transformed/klines/1m"),
+    hive_uploader = Trades2HiveUploader(
+        zipped_data_dir=Path("D:/data/zipped_data/trades"),
+        output_dir=Path("D:/data/transformed/trades-gzip"),
     )
 
-    hive_uploader.run()
+    hive_uploader.run_multiprocessing(processes=15)
 
 
 if __name__ == "__main__":

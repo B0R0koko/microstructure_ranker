@@ -2,20 +2,20 @@ from datetime import date
 from pathlib import Path
 from typing import List
 
+from data_collection.datavision.parsers.trades import TradeParser
+from data_collection.datavision.settings import SETTINGS
 from scrapy.crawler import CrawlerProcess
 
 from core.currency import collect_all_currency_pairs, CurrencyPair
-from core.parser_enums import CollectMode, KlineInterval
+from core.parser_enums import CollectMode
 from core.time_utils import Bounds
-from data_collection.datavision.parsers.klines import KlineParser
-from data_collection.datavision.settings import SETTINGS
 
 
 def main():
-    data_dir: Path = Path("D:/data/zipped_data/1m")
+    data_dir: Path = Path("D:/data/zipped_data/trades")
     bounds: Bounds = Bounds.for_days(
-        start_inclusive=date(2024, 11, 1),
-        end_exclusive=date(2024, 12, 1)
+        start_inclusive=date(2024, 1, 1),
+        end_exclusive=date(2025, 2, 1)
     )
     process: CrawlerProcess = CrawlerProcess(settings=SETTINGS)
     # Only collect data for USDT paired currency_pairs
@@ -25,11 +25,10 @@ def main():
     ]
 
     process.crawl(
-        KlineParser,
+        TradeParser,
         bounds=bounds,
         currency_pairs=usdt_pairs,
         collect_mode=CollectMode.MONTHLY,
-        kline_interval=KlineInterval.MINUTE,
         output_dir=data_dir
     )
     process.start()

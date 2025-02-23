@@ -2,7 +2,7 @@
 name = "microstructure-price-prediction"
 version = "0.1.0"
 description = ""
-authors = ["Mikhail Mironov, Maxim Shibanov"]
+authors = ["Mikhail Mironov <mihail.borokoko@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]

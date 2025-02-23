@@ -1,6 +1,6 @@
 from pathlib import Path
 
-import polars as pl
+import pandas as pd
 
 from core.columns import *
 from core.currency import CurrencyPair
@@ -11,30 +11,27 @@ _INCLUDE_COLUMNS: List[str] = [PRICE, QUANTITY, TRADE_TIME, IS_BUYER_MAKER]
 
 class Trades2HiveUploader(Uploader2Hive):
 
-    def __init__(self, zipped_data_dir: Path, temp_dir: Path, output_dir: Path):
+    def __init__(self, zipped_data_dir: Path, output_dir: Path):
         super().__init__(
             zipped_data_dir=zipped_data_dir,
-            temp_dir=temp_dir,
             output_dir=output_dir,
             column_names=BINANCE_TRADE_COLS,
             include_columns=_INCLUDE_COLUMNS
         )
 
-    def preprocess_batched_data(self, df: pl.DataFrame, currency_pair: CurrencyPair) -> pl.DataFrame:
-        df = df.with_columns(
-            pl.lit(currency_pair.name).alias(SYMBOL),
-            pl.col(TRADE_TIME).cast(pl.Datetime(time_unit="ms")).alias(TRADE_TIME)
-        )
+    def preprocess_batched_data(self, df: pd.DataFrame, currency_pair: CurrencyPair) -> pd.DataFrame:
+        df[TRADE_TIME] = pd.to_datetime(df[TRADE_TIME], unit="ms", errors="coerce")
+        df[SYMBOL] = currency_pair.name
         # Create date column from TRADE_TIME
-        df = df.with_columns(pl.col(TRADE_TIME).dt.date().alias("date"))
+        df["date"] = df[TRADE_TIME].dt.date
         return df
 
-    def save_to_hive(self, df: pl.DataFrame) -> None:
-        df.write_parquet(
+    def save_batch_to_hive(self, df: pd.DataFrame) -> None:
+        df.to_parquet(
             self.output_dir,
-            use_pyarrow=True,
-            pyarrow_options={
-                "partition_cols": ["date", SYMBOL],  # define set of filters here
-                "existing_data_behavior": "overwrite_or_ignore",
-            }
+            engine="pyarrow",
+            compression="gzip",
+            partition_cols=["date", "symbol"],
+            existing_data_behavior="overwrite_or_ignore",
+            basename_template="data_chunk_{i}"
         )
