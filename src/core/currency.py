@@ -11,12 +11,6 @@ from core.time_utils import Bounds
 
 
 @dataclass
-class Currency:
-    base: str
-    term: str
-
-
-@dataclass
 class CurrencyPair:
     base: str
     term: str

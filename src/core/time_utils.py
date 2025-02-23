@@ -119,6 +119,13 @@ class Bounds:
     def contain_days(self, day: date) -> bool:
         return self.day0 <= day <= self.day1
 
+    def create_offset_bounds(self, time_offset: "TimeOffset") -> "Bounds":
+        """Returns Bounds for the interval which is used to compute target"""
+        return Bounds(
+            start_inclusive=self.end_exclusive,
+            end_exclusive=self.end_exclusive + time_offset.value,
+        )
+
 
 class TimeOffset(Enum):
     FIVE_SECONDS: timedelta = timedelta(seconds=5)

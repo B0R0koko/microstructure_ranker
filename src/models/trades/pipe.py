@@ -1,7 +1,7 @@
 import gc
 import json
 import os
-from datetime import timedelta, date, datetime
+from datetime import timedelta, date
 from functools import partial
 from multiprocessing import Pool, freeze_support, RLock
 from multiprocessing.pool import AsyncResult
@@ -77,7 +77,7 @@ class TradesPipeline:
     def __init__(
             self, hive_dir: Path, output_features_path: Path, warmup_start: bool = False, num_processes: int = 5
     ):
-        self._hive = pl.scan_parquet(source=hive_dir)
+        self._hive = pl.scan_parquet(source=hive_dir, hive_partitioning=True)
         self.hive_dir: Path = hive_dir
         self.output_features_path: Path = output_features_path
         self.warmup_start: bool = warmup_start
@@ -95,18 +95,19 @@ class TradesPipeline:
         return df_currency_pair.select(USE_COLS).collect()
 
     def attach_target_for_currency_pair(
-            self, currency_pair: CurrencyPair, bounds: Bounds, prediction_offset: timedelta
+            self, currency_pair: CurrencyPair, bounds: Bounds, time_offset: TimeOffset
     ) -> float:
         """Attach target log_return column that we aim to predict"""
-        effective_end_time: datetime = bounds.end_exclusive + prediction_offset
+        offset_bounds: Bounds = bounds.create_offset_bounds(time_offset=time_offset)
 
         currency_pair_log_return: float = (
             self._hive
             .filter(
                 (pl.col(SYMBOL) == currency_pair.name) &
-                (pl.col("date").is_between(bounds.day0, bounds.day1)) &
-                (pl.col(TRADE_TIME).is_between(bounds.end_exclusive, effective_end_time))
+                (pl.col("date").is_between(offset_bounds.day0, offset_bounds.day1)) &
+                (pl.col(TRADE_TIME).is_between(offset_bounds.start_inclusive, offset_bounds.end_exclusive))
             )
+            .sort(by=TRADE_TIME, descending=False)
             .select((pl.col(PRICE).last() / pl.col(PRICE).first()).log())
             .collect()
             .item()
@@ -140,7 +141,7 @@ class TradesPipeline:
                 currency_pair=currency_pair, df_currency_pair=df_currency_pair, bounds=bounds
             )
             currency_pair_features["log_return"] = self.attach_target_for_currency_pair(
-                currency_pair=currency_pair, bounds=bounds, prediction_offset=TimeOffset.HOUR.value
+                currency_pair=currency_pair, bounds=bounds, time_offset=TimeOffset.HOUR
             )
             cross_section_features.append(currency_pair_features)
 
@@ -185,7 +186,7 @@ class TradesPipeline:
             }
             for i, bounds in enumerate(cross_section_bounds)
         }
-
+        print("Created progress tracker from new tasks")
         return ProgressTracker(progress_path=PROGRESS_FILE, task_map=task_map)
 
     # Parallelize this function to be able to run at least using multiple processes
@@ -200,6 +201,7 @@ class TradesPipeline:
 
         with Pool(processes=self.num_processes, initializer=tqdm.set_lock, initargs=(tqdm.get_lock(),),
                   maxtasksperchild=1) as pool:
+
             promises: List[AsyncResult] = []
 
             for i, (task_id, kwargs) in enumerate(progress_tracker.iterate()):
@@ -213,22 +215,22 @@ class TradesPipeline:
                 )
                 promises.append(promise)
 
-        for promise in tqdm(promises, desc="Overall progress", position=0):
-            task_id, df_cross_section = promise.get()
-            self.write_features(df=df_cross_section)
+            for promise in tqdm(promises, desc="Overall progress", position=0):
+                task_id, df_cross_section = promise.get()
+                self.write_features(df=df_cross_section)
 
-            del df_cross_section, promise
-            gc.collect()
-            # Update ProgressTracker
-            progress_tracker.complete(task_id=task_id)
+                del df_cross_section, promise
+                gc.collect()
+                # Update ProgressTracker
+                progress_tracker.complete(task_id=task_id)
 
 
 def _test_main():
     hive_dir: Path = Path("D:/data/transformed/trades")
     output_features_path: Path = Path("D:/data/features/features_19-02-2025.parquet")
 
-    start_date: date = date(2024, 11, 1)
-    end_date: date = date(2024, 12, 30)
+    start_date: date = date(2024, 8, 1)
+    end_date: date = date(2024, 11, 1)
     bounds: Bounds = Bounds.for_days(start_date, end_date)
 
     step: timedelta = timedelta(hours=1)
@@ -240,7 +242,7 @@ def _test_main():
         hive_dir=hive_dir,
         output_features_path=output_features_path,
         num_processes=20,
-        warmup_start=True
+        warmup_start=False
     )
     pipeline.load_multiple_cross_sections(cross_section_bounds=cross_section_bounds)
 

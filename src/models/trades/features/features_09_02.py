@@ -2,8 +2,8 @@ from typing import Dict, Any, List
 
 import polars as pl
 
-from analysis.core.currency import CurrencyPair
-from analysis.core.time_utils import Bounds, TimeOffset
+from core.currency import CurrencyPair
+from core.time_utils import Bounds, TimeOffset
 
 
 def compute_slippage(df_trades: pl.LazyFrame) -> pl.LazyFrame:
@@ -69,7 +69,7 @@ def select_features(df_trades: pl.LazyFrame, bounds: Bounds, offset: TimeOffset)
                 .alias(f"mle_alpha_powerlaw_{offset.name}")
             )
         )
-        .collect()
+        .collect(engine="gpu")
         .to_dict(as_series=False)
     )
 
@@ -99,7 +99,8 @@ def compute_features(df_currency_pair: pl.LazyFrame, currency_pair: CurrencyPair
         TimeOffset.HALF_HOUR,
         TimeOffset.HOUR,
         TimeOffset.TWO_HOURS,
-        TimeOffset.FOUR_HOURS
+        TimeOffset.FOUR_HOURS,
+        TimeOffset.TWELVE_HOURS
     ]
 
     all_features: Dict[str, Any] = {"currency_pair": currency_pair.binance_name}

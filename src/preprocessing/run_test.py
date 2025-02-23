@@ -1,26 +1,30 @@
 from datetime import date
+from pathlib import Path
 
 import polars as pl
 
-from core.columns import SYMBOL
-from core.currency import CurrencyPair
 from core.time_utils import Bounds
 
 
 def main():
-    df: pl.LazyFrame = pl.scan_parquet("D:/data/transformed/trades")
-    currency_pair: CurrencyPair = CurrencyPair(base="ADA", term="USDT")
-
+    hive_dir: Path = Path("D:/data/transformed/trades/")
     start_date: date = date(2024, 11, 1)
-    end_date: date = date(2024, 11, 30)
+    end_date: date = date(2024, 11, 2)
     bounds: Bounds = Bounds.for_days(start_date, end_date)
 
-    df = df.filter(
+    # df = pd.read_parquet(
+    #     hive_dir,
+    #     engine="pyarrow",
+    #     filters=[("date", ">=", "2024-11-01"), ("symbol", "=", "ADA-USDT"), ("date", "<=", "2024-11-02")]
+    # )
+    # print(df)
+
+    df = pl.scan_parquet(source=hive_dir).filter(
         (pl.col("date").is_between(bounds.day0, bounds.day1)) &
-        (pl.col(SYMBOL) == currency_pair.name)
+        (pl.col("symbol") == "ADA-USDT")
     )
 
-    print(df.select(pl.len()).collect())
+    print(df.collect())
 
 
 if __name__ == '__main__':
