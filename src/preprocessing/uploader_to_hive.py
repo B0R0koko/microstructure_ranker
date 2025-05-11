@@ -34,7 +34,7 @@ class Uploader2Hive(ABC):
         self.column_names: List[str] = column_names
         self.include_columns: List[str] = include_columns
 
-        self.currency_pairs: List[CurrencyPair] = [CurrencyPair.from_string("ADA-USDT")]
+        self.currency_pairs: List[CurrencyPair] = self._parse_collected_currency_pairs()
 
     @abstractmethod
     def preprocess_batched_data(self, df: pd.DataFrame, currency_pair: CurrencyPair, file_date: date) -> pl.DataFrame:
