@@ -128,6 +128,7 @@ class Bounds:
 
 
 class TimeOffset(Enum):
+    ONE_SECOND: timedelta = timedelta(seconds=1)
     FIVE_SECONDS: timedelta = timedelta(seconds=5)
     TEN_SECONDS: timedelta = timedelta(seconds=10)
     HALF_MINUTE: timedelta = timedelta(seconds=30)

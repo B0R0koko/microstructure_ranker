@@ -16,7 +16,7 @@ from core.columns import TRADE_TIME, SYMBOL, PRICE
 from core.currency import CurrencyPair, get_cross_section_currencies
 from core.paths import FEATURE_DIR, HIVE_TRADES
 from core.time_utils import Bounds, TimeOffset
-from models.trades.features.features_27_11 import compute_features
+from models.trades.features.features_11_05 import compute_features
 
 USE_COLS: List[str] = ["price", "quantity", "trade_time", "is_buyer_maker"]
 PROGRESS_FILE: Path = Path("src/core/progress.json")
@@ -76,13 +76,15 @@ class TradesPipeline:
     """Define first feature pipeline here. Make sure to implement all methods from abstract parent class"""
 
     def __init__(
-            self, hive_dir: Path, output_features_path: Path, warmup_start: bool = False, num_processes: int = 5
+            self, hive_dir: Path, output_features_path: Path, forecast_step: TimeOffset, warmup_start: bool = False,
+            num_processes: int = 5,
     ):
         self._hive = pl.scan_parquet(source=hive_dir, hive_partitioning=True)
         self.hive_dir: Path = hive_dir
         self.output_features_path: Path = output_features_path
         self.warmup_start: bool = warmup_start
         self.num_processes: int = num_processes
+        self.forecast_step: TimeOffset = forecast_step
 
     def load_data_for_currency_pair(self, currency_pair: CurrencyPair, bounds: Bounds) -> pl.DataFrame:
         """Load data for a given CurrencyPair with specific time interval [start_time, end_time)"""
@@ -142,7 +144,7 @@ class TradesPipeline:
                 currency_pair=currency_pair, df_currency_pair=df_currency_pair, bounds=bounds
             )
             currency_pair_features["log_return"] = self.attach_target_for_currency_pair(
-                currency_pair=currency_pair, bounds=bounds, time_offset=TimeOffset.FOUR_HOURS
+                currency_pair=currency_pair, bounds=bounds, time_offset=self.forecast_step
             )
             cross_section_features.append(currency_pair_features)
 
@@ -227,10 +229,10 @@ class TradesPipeline:
 
 
 def _test_main():
-    output_features_path: Path = FEATURE_DIR.joinpath("features_2025-05-06.parquet")
+    output_features_path: Path = FEATURE_DIR.joinpath("features_2025-05-11.parquet")
 
-    start_date: date = date(2024, 1, 1)
-    end_date: date = date(2024, 3, 1)
+    start_date: date = date(2025, 1, 1)
+    end_date: date = date(2025, 5, 1)
     bounds: Bounds = Bounds.for_days(start_date, end_date)
 
     step: timedelta = timedelta(hours=1)
@@ -242,7 +244,8 @@ def _test_main():
         hive_dir=HIVE_TRADES,
         output_features_path=output_features_path,
         num_processes=20,
-        warmup_start=False
+        warmup_start=False,
+        forecast_step=TimeOffset.HOUR,
     )
     pipeline.load_multiple_cross_sections(cross_section_bounds=cross_section_bounds)
 
