@@ -1,5 +1,7 @@
 import os
+import re
 from abc import ABC, abstractmethod
+from datetime import date, datetime
 from functools import partial
 from multiprocessing import Pool
 from multiprocessing.pool import AsyncResult
@@ -32,10 +34,10 @@ class Uploader2Hive(ABC):
         self.column_names: List[str] = column_names
         self.include_columns: List[str] = include_columns
 
-        self.currency_pairs: List[CurrencyPair] = self._parse_collected_currency_pairs()
+        self.currency_pairs: List[CurrencyPair] = [CurrencyPair.from_string("ADA-USDT")]
 
     @abstractmethod
-    def preprocess_batched_data(self, df: pd.DataFrame, currency_pair: CurrencyPair) -> pl.DataFrame:
+    def preprocess_batched_data(self, df: pd.DataFrame, currency_pair: CurrencyPair, file_date: date) -> pl.DataFrame:
         """Preprocess data read from batched csv reader"""
 
     @abstractmethod
@@ -59,10 +61,14 @@ class Uploader2Hive(ABC):
                 .joinpath(currency_pair.name)
                 .joinpath(file)
             )
-            self.save_to_pyarrow_hive(zipped_csv_file_path=zip_file, currency_pair=currency_pair)
+            parsed_date: date = (
+                datetime.strptime(re.search(r"-(\d{4}-\d{2})\.zip$", file).group(1), "%Y-%m")
+                .date()
+            )
+            self.save_to_pyarrow_hive(zipped_csv_file_path=zip_file, currency_pair=currency_pair, file_date=parsed_date)
 
     def save_to_pyarrow_hive(
-            self, zipped_csv_file_path: Path, currency_pair: CurrencyPair
+            self, zipped_csv_file_path: Path, currency_pair: CurrencyPair, file_date: date
     ) -> None:
         """
         Preprocess and partition data by date using PyArrow hive partitioning, optimized for large datasets.
@@ -80,7 +86,7 @@ class Uploader2Hive(ABC):
 
         for batch_id, batch in enumerate(csv_reader):
             # Example processing: Display the first few rows
-            self.preprocess_batched_data(df=batch, currency_pair=currency_pair)
+            self.preprocess_batched_data(df=batch, currency_pair=currency_pair, file_date=file_date)
             self.save_batch_to_hive(df=batch)
 
     def run(self) -> None:

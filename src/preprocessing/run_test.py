@@ -12,13 +12,6 @@ def main():
     end_date: date = date(2024, 11, 2)
     bounds: Bounds = Bounds.for_days(start_date, end_date)
 
-    # df = pd.read_parquet(
-    #     hive_dir,
-    #     engine="pyarrow",
-    #     filters=[("date", ">=", "2024-11-01"), ("symbol", "=", "ADA-USDT"), ("date", "<=", "2024-11-02")]
-    # )
-    # print(df)
-
     df = pl.scan_parquet(source=hive_dir).filter(
         (pl.col("date").is_between(bounds.day0, bounds.day1)) &
         (pl.col("symbol") == "ADA-USDT")

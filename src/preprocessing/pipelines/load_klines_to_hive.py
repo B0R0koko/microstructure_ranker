@@ -1,10 +1,11 @@
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
-from preprocessing.uploader_to_hive import Uploader2Hive
 
 from core.columns import *
 from core.currency import CurrencyPair
+from preprocessing.uploader_to_hive import Uploader2Hive
 
 _INCLUDE_COLUMNS: List[str] = [
     OPEN_TIME,
@@ -30,7 +31,7 @@ class Klines2HiveUploader(Uploader2Hive):
             include_columns=_INCLUDE_COLUMNS
         )
 
-    def preprocess_batched_data(self, df: pd.DataFrame, currency_pair: CurrencyPair) -> pd.DataFrame:
+    def preprocess_batched_data(self, df: pd.DataFrame, currency_pair: CurrencyPair, file_date: date) -> pd.DataFrame:
         df[SYMBOL] = currency_pair.name
 
         df[OPEN_TIME] = pd.to_datetime(df[OPEN_TIME], unit="ms")
@@ -44,7 +45,7 @@ class Klines2HiveUploader(Uploader2Hive):
         df.to_parquet(
             self.output_dir,
             engine="pyarrow",
-            compression="lz4",
+            compression="gzip",
             partition_cols=["date", "symbol"],
             existing_data_behavior="overwrite_or_ignore"
         )

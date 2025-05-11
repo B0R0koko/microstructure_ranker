@@ -16,7 +16,7 @@ from core.columns import TRADE_TIME, SYMBOL, PRICE
 from core.currency import CurrencyPair, get_cross_section_currencies
 from core.paths import FEATURE_DIR, HIVE_TRADES
 from core.time_utils import Bounds, TimeOffset
-from models.trades.features.features_11_05 import compute_features
+from models.trades.features.features_27_11 import compute_features
 
 USE_COLS: List[str] = ["price", "quantity", "trade_time", "is_buyer_maker"]
 PROGRESS_FILE: Path = Path("src/core/progress.json")
@@ -235,8 +235,8 @@ def _test_main():
     end_date: date = date(2025, 5, 1)
     bounds: Bounds = Bounds.for_days(start_date, end_date)
 
-    step: timedelta = timedelta(hours=1)
-    interval: timedelta = timedelta(hours=24)
+    step: timedelta = timedelta(hours=4)
+    interval: timedelta = timedelta(hours=24 * 7)
 
     cross_section_bounds: List[Bounds] = bounds.generate_overlapping_bounds(step=step, interval=interval)
 
@@ -245,7 +245,7 @@ def _test_main():
         output_features_path=output_features_path,
         num_processes=20,
         warmup_start=False,
-        forecast_step=TimeOffset.HOUR,
+        forecast_step=TimeOffset.FOUR_HOURS,
     )
     pipeline.load_multiple_cross_sections(cross_section_bounds=cross_section_bounds)
 

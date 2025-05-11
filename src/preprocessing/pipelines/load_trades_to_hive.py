@@ -1,3 +1,4 @@
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
@@ -19,8 +20,10 @@ class Trades2HiveUploader(Uploader2Hive):
             include_columns=_INCLUDE_COLUMNS
         )
 
-    def preprocess_batched_data(self, df: pd.DataFrame, currency_pair: CurrencyPair) -> pd.DataFrame:
-        df[TRADE_TIME] = pd.to_datetime(df[TRADE_TIME], unit="ms", errors="coerce")
+    def preprocess_batched_data(self, df: pd.DataFrame, currency_pair: CurrencyPair, file_date: date) -> pd.DataFrame:
+        # Binance updated their data streams to microseconds => if needed we will have to append 3 zeros at the end
+        unit: str = "ms" if file_date < date(2025, 1, 1) else "us"
+        df[TRADE_TIME] = pd.to_datetime(df[TRADE_TIME], unit=unit, errors="coerce")
         df[SYMBOL] = currency_pair.name
         # Create date column from TRADE_TIME
         df["date"] = df[TRADE_TIME].dt.date
@@ -33,5 +36,4 @@ class Trades2HiveUploader(Uploader2Hive):
             compression="gzip",
             partition_cols=["date", "symbol"],
             existing_data_behavior="overwrite_or_ignore",
-            basename_template="data_chunk_{i}"
         )
