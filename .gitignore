@@ -1,1 +1,13 @@
+# Project exclude paths
+/.gradle/
+/build/
+/buildSrc/.gradle
+/gradlew.bat
+/.idea
+!/.idea/codeStyles
+!/.idea/inspectionProfiles
+**/build
+**/__pycache__/
+/not-so-secret/
 .env
+.png

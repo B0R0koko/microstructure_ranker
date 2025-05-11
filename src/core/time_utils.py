@@ -139,6 +139,9 @@ class TimeOffset(Enum):
     TWO_HOURS: timedelta = timedelta(hours=2)
     FOUR_HOURS: timedelta = timedelta(hours=4)
     TWELVE_HOURS: timedelta = timedelta(hours=12)
+    DAY: timedelta = timedelta(days=1)
+    THREE_DAYS: timedelta = timedelta(days=3)
+    WEEK: timedelta = timedelta(days=7)
 
 
 if __name__ == "__main__":

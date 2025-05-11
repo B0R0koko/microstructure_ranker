@@ -3,9 +3,9 @@ from pathlib import Path
 import pandas as pd
 import polars as pl
 
-from analysis.core import SYMBOL
-from analysis.core.currency import CurrencyPair
-from analysis.preprocessing import Trades2HiveUploader
+from core.columns import SYMBOL
+from core.currency import CurrencyPair
+from preprocessing.pipelines.load_trades_to_hive import Trades2HiveUploader
 
 
 def test_preprocess_zip_file() -> None:

@@ -144,11 +144,15 @@ def compute_features(df_currency_pair: pl.DataFrame, currency_pair: CurrencyPair
     desired_offsets: List[TimeOffset] = [
         TimeOffset.MINUTE,
         TimeOffset.FIVE_MINUTES,
+        TimeOffset.FIFTEEN_MINUTES,
         TimeOffset.HALF_HOUR,
         TimeOffset.HOUR,
         TimeOffset.TWO_HOURS,
         TimeOffset.FOUR_HOURS,
-        TimeOffset.TWELVE_HOURS
+        TimeOffset.TWELVE_HOURS,
+        TimeOffset.DAY,
+        TimeOffset.THREE_DAYS,
+        TimeOffset.WEEK
     ]
     # Start computing features using desired offsets
     volume_imbalance_features: Dict[str, float] = compute_volume_imbalance(

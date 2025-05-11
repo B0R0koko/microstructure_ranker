@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 from core.columns import TRADE_TIME, SYMBOL, PRICE
 from core.currency import CurrencyPair, get_cross_section_currencies
+from core.paths import FEATURE_DIR, HIVE_TRADES
 from core.time_utils import Bounds, TimeOffset
 from models.trades.features.features_27_11 import compute_features
 
@@ -108,7 +109,7 @@ class TradesPipeline:
                 (pl.col(TRADE_TIME).is_between(offset_bounds.start_inclusive, offset_bounds.end_exclusive))
             )
             .sort(by=TRADE_TIME, descending=False)
-            .select((pl.col(PRICE).last() / pl.col(PRICE).first()).log())
+            .select(pl.col(PRICE).last() / pl.col(PRICE).first() - 1)
             .collect()
             .item()
         )
@@ -141,7 +142,7 @@ class TradesPipeline:
                 currency_pair=currency_pair, df_currency_pair=df_currency_pair, bounds=bounds
             )
             currency_pair_features["log_return"] = self.attach_target_for_currency_pair(
-                currency_pair=currency_pair, bounds=bounds, time_offset=TimeOffset.HOUR
+                currency_pair=currency_pair, bounds=bounds, time_offset=TimeOffset.FOUR_HOURS
             )
             cross_section_features.append(currency_pair_features)
 
@@ -226,20 +227,19 @@ class TradesPipeline:
 
 
 def _test_main():
-    hive_dir: Path = Path("D:/data/transformed/trades")
-    output_features_path: Path = Path("D:/data/features/features_19-02-2025.parquet")
+    output_features_path: Path = FEATURE_DIR.joinpath("features_2025-05-06.parquet")
 
-    start_date: date = date(2024, 8, 1)
-    end_date: date = date(2024, 11, 1)
+    start_date: date = date(2024, 1, 1)
+    end_date: date = date(2024, 3, 1)
     bounds: Bounds = Bounds.for_days(start_date, end_date)
 
     step: timedelta = timedelta(hours=1)
-    interval: timedelta = timedelta(hours=12)
+    interval: timedelta = timedelta(hours=24)
 
     cross_section_bounds: List[Bounds] = bounds.generate_overlapping_bounds(step=step, interval=interval)
 
     pipeline: TradesPipeline = TradesPipeline(
-        hive_dir=hive_dir,
+        hive_dir=HIVE_TRADES,
         output_features_path=output_features_path,
         num_processes=20,
         warmup_start=False
