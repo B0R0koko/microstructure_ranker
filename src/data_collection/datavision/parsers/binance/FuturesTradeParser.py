@@ -8,7 +8,7 @@ from core.time_utils import Bounds
 from data_collection.datavision.parser import DataParser, BINANCE_S3
 
 
-class TradeParser(DataParser):
+class BinanceFuturesTradeParser(DataParser):
     name: str = "trades_parser"
 
     def __init__(
@@ -28,7 +28,7 @@ class TradeParser(DataParser):
     def get_currency_url(self, currency_pair: CurrencyPair, marker: Optional[str] = None) -> str:
         params: Dict[str, str] = {
             "delimiter": "/",
-            "prefix": f"data/spot/{self.collect_mode.lower()}/trades/{currency_pair.binance_name}/",
+            "prefix": f"data/futures/um/{self.collect_mode.lower()}/trades/{currency_pair.binance_name}/",
         }
 
         if marker is not None:

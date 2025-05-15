@@ -36,6 +36,10 @@ def _convert_to_dates(dates: pd.DatetimeIndex) -> List[date]:
     return [el.date() for el in dates]
 
 
+def get_seconds_postfix(td: timedelta) -> str:
+    return f"{td.total_seconds()}S"
+
+
 def generate_daily_time_chunks(start_date: date, end_date: date) -> Optional[List[date]]:
     days: List[date] = []
 
@@ -89,6 +93,13 @@ class Bounds:
             end_exclusive=end_of_the_day(day=end_exclusive - timedelta(days=1)),
         )
 
+    @classmethod
+    def for_day(cls, day: date) -> "Bounds":
+        return cls(
+            start_inclusive=start_of_the_day(day=day),
+            end_exclusive=end_of_the_day(day=day),
+        )
+
     @property
     def day0(self) -> date:
         return self.start_inclusive.date()
@@ -126,8 +137,21 @@ class Bounds:
             end_exclusive=self.end_exclusive + time_offset.value,
         )
 
+    def expand_bounds(
+            self, lb_timedelta: Optional[timedelta] = None, rb_timedelta: Optional[timedelta] = None
+    ) -> "Bounds":
+        return Bounds(
+            start_inclusive=self.start_inclusive - lb_timedelta if lb_timedelta else self.start_inclusive,
+            end_exclusive=self.end_exclusive + rb_timedelta if rb_timedelta else self.end_exclusive,
+        )
+
+    def iter_hours(self):
+        for lb in pd.date_range(self.day0, self.day1, freq="4h", inclusive="left"):
+            yield Bounds(lb, lb + timedelta(hours=4))
+
 
 class TimeOffset(Enum):
+    HALF_SECOND: timedelta = timedelta(milliseconds=500)
     ONE_SECOND: timedelta = timedelta(seconds=1)
     FIVE_SECONDS: timedelta = timedelta(seconds=5)
     TEN_SECONDS: timedelta = timedelta(seconds=10)
@@ -139,10 +163,12 @@ class TimeOffset(Enum):
     HOUR: timedelta = timedelta(hours=1)
     TWO_HOURS: timedelta = timedelta(hours=2)
     FOUR_HOURS: timedelta = timedelta(hours=4)
+    EIGHT_HOURS: timedelta = timedelta(hours=8)
     TWELVE_HOURS: timedelta = timedelta(hours=12)
     DAY: timedelta = timedelta(days=1)
     THREE_DAYS: timedelta = timedelta(days=3)
     WEEK: timedelta = timedelta(days=7)
+    TWO_WEEKS: timedelta = timedelta(days=14)
 
 
 if __name__ == "__main__":

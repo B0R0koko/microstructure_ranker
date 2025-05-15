@@ -36,9 +36,18 @@ class CurrencyPair:
         return hash((self.base, self.term))
 
 
-def collect_all_currency_pairs() -> List[CurrencyPair]:
+def collect_all_spot_currency_pairs() -> List[CurrencyPair]:
     """Collect a set of all CurrencyPairs traded on Binance"""
     resp = requests.get("https://api.binance.com/api/v3/exchangeInfo")
+    data: Dict[str, Any] = resp.json()
+    return [
+        CurrencyPair(base=entry["baseAsset"], term=entry["quoteAsset"]) for entry in data["symbols"]
+    ]
+
+
+def collect_all_usdm_currency_pairs() -> List[CurrencyPair]:
+    """Collect a set of all CurrencyPairs traded on BINANCE_USDM"""
+    resp = requests.get("https://fapi.binance.com/fapi/v1/exchangeInfo")
     data: Dict[str, Any] = resp.json()
     return [
         CurrencyPair(base=entry["baseAsset"], term=entry["quoteAsset"]) for entry in data["symbols"]

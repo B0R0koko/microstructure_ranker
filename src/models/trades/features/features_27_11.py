@@ -34,6 +34,7 @@ def aggregate_ticks_into_trades(df_currency_pair: pl.DataFrame) -> pl.DataFrame:
             # Amount of base asset transacted
             quantity_abs=pl.col("quantity").sum(),
             quantity_sign=pl.col("quantity_sign").sum(),
+            num_ticks=pl.col("price").count(),  # number of ticks for each trade
         )
     )
     # Create boolean indicating if the trade was long or short
@@ -95,7 +96,8 @@ def compute_log_return_features(
         df_currency_pair: pl.DataFrame, bounds: Bounds, time_offsets: List[TimeOffset]
 ) -> Dict[str, float]:
     """Compute log returns for different intervals before the prediction timestamp with different time_offsets"""
-    return {
+    # Overall log_returns over intervals
+    overall_log_returns: Dict[str, float] = {
         f"log_return_{offset.name}": (
             df_currency_pair
             .filter(pl.col("trade_time").is_between(bounds.end_exclusive - offset.value, bounds.end_exclusive))
@@ -104,6 +106,7 @@ def compute_log_return_features(
         )
         for offset in time_offsets
     }
+    return overall_log_returns
 
 
 def compute_alpha_powerlaw(
@@ -140,6 +143,19 @@ def compute_features(df_currency_pair: pl.DataFrame, currency_pair: CurrencyPair
     # Aggregate ticks executed at the same ns timestamp into trades
     df_currency_pair = aggregate_ticks_into_trades(df_currency_pair=df_currency_pair)
     df_currency_pair = compute_slippage(df_currency_pair=df_currency_pair)
+
+    df_hourly: pl.DataFrame = (
+        df_currency_pair
+        .set_sorted(column="trade_time")
+        .group_by_dynamic(
+            index_column="trade_time", every="1h", period="1h", closed="left", label="left"
+        )
+        .agg(
+            (pl.col("price_last").last() / pl.col("price_first").first()).log().alias("log_return"),
+        )
+    )
+
+    print(df_hourly)
 
     desired_offsets: List[TimeOffset] = [
         TimeOffset.MINUTE,

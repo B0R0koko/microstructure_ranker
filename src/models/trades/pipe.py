@@ -16,21 +16,21 @@ from core.columns import TRADE_TIME, SYMBOL, PRICE
 from core.currency import CurrencyPair, get_cross_section_currencies
 from core.paths import FEATURE_DIR, HIVE_TRADES
 from core.time_utils import Bounds, TimeOffset
-from models.trades.features.features_27_11 import compute_features
+from models.trades.features.high_frequency_features import compute_features
 
 USE_COLS: List[str] = ["price", "quantity", "trade_time", "is_buyer_maker"]
 PROGRESS_FILE: Path = Path("src/core/progress.json")
 
 
 def compute_features_for_currency_pair(
-        currency_pair: CurrencyPair, df_currency_pair: pl.DataFrame, bounds: Bounds
+        currency_pair: CurrencyPair, df_ticks: pl.DataFrame, bounds: Bounds
 ) -> Dict[str, Any]:
     """
-    Given the data from df_currency_pair, call compute_features function on it
+    Given the data from df_ticks, call compute_features function on it
     which returns a mapping of feature names to their corresponding values
     """
     features: Dict[str, Any] = compute_features(
-        df_currency_pair=df_currency_pair, currency_pair=currency_pair, bounds=bounds
+        df_ticks=df_ticks, currency_pair=currency_pair, bounds=bounds
     )
     return features
 
@@ -88,14 +88,14 @@ class TradesPipeline:
 
     def load_data_for_currency_pair(self, currency_pair: CurrencyPair, bounds: Bounds) -> pl.DataFrame:
         """Load data for a given CurrencyPair with specific time interval [start_time, end_time)"""
-        df_currency_pair: pl.LazyFrame = self._hive.filter(
+        df_ticks: pl.LazyFrame = self._hive.filter(
             (pl.col(SYMBOL) == currency_pair.name) &
             # Load data by filtering by both hive folder structure and columns inside each parquet file
             (pl.col("date").is_between(bounds.day0, bounds.day1)) &
             (pl.col(TRADE_TIME).is_between(bounds.start_inclusive, bounds.end_exclusive))
         )
 
-        return df_currency_pair.select(USE_COLS).collect()
+        return df_ticks.select(USE_COLS).collect()
 
     def attach_target_for_currency_pair(
             self, currency_pair: CurrencyPair, bounds: Bounds, time_offset: TimeOffset
@@ -103,7 +103,7 @@ class TradesPipeline:
         """Attach target log_return column that we aim to predict"""
         offset_bounds: Bounds = bounds.create_offset_bounds(time_offset=time_offset)
 
-        currency_pair_log_return: float = (
+        currency_pair_return: float = (
             self._hive
             .filter(
                 (pl.col(SYMBOL) == currency_pair.name) &
@@ -116,7 +116,7 @@ class TradesPipeline:
             .item()
         )
 
-        return currency_pair_log_return
+        return currency_pair_return
 
     def load_cross_section(self, bounds: Bounds, task_id: str, position: int) -> Tuple[str, pl.DataFrame]:
         """
@@ -136,20 +136,20 @@ class TradesPipeline:
 
         for currency_pair in currency_pairs:
             # Load and collect pl.DataFrame for current CurrencyPair, read to RAM no avoid calling collect multiple times
-            df_currency_pair: pl.DataFrame = self.load_data_for_currency_pair(
+            df_ticks: pl.DataFrame = self.load_data_for_currency_pair(
                 currency_pair=currency_pair, bounds=bounds
             )
             # Compute features using loaded pl.DataFrame
             currency_pair_features: Dict[str, Any] = compute_features_for_currency_pair(
-                currency_pair=currency_pair, df_currency_pair=df_currency_pair, bounds=bounds
+                currency_pair=currency_pair, df_ticks=df_ticks, bounds=bounds
             )
-            currency_pair_features["log_return"] = self.attach_target_for_currency_pair(
+            currency_pair_features["return"] = self.attach_target_for_currency_pair(
                 currency_pair=currency_pair, bounds=bounds, time_offset=self.forecast_step
             )
             cross_section_features.append(currency_pair_features)
 
             # Delete collected data from ram to perhaps free up some ram as we get a lot of MemoryErrors
-            del df_currency_pair
+            del df_ticks
             gc.collect()
 
             pbar.update(1)
@@ -229,14 +229,14 @@ class TradesPipeline:
 
 
 def _test_main():
-    output_features_path: Path = FEATURE_DIR.joinpath("features_2025-05-11.parquet")
+    output_features_path: Path = FEATURE_DIR.joinpath("features_2025-05-15@RETURN_1S.parquet")
 
-    start_date: date = date(2025, 1, 1)
-    end_date: date = date(2025, 5, 1)
+    start_date: date = date(2024, 1, 1)
+    end_date: date = date(2024, 1, 2)
     bounds: Bounds = Bounds.for_days(start_date, end_date)
 
-    step: timedelta = timedelta(hours=4)
-    interval: timedelta = timedelta(hours=24 * 7)
+    step: timedelta = timedelta(seconds=1)
+    interval: timedelta = timedelta(minutes=5)
 
     cross_section_bounds: List[Bounds] = bounds.generate_overlapping_bounds(step=step, interval=interval)
 
@@ -245,7 +245,7 @@ def _test_main():
         output_features_path=output_features_path,
         num_processes=20,
         warmup_start=False,
-        forecast_step=TimeOffset.FOUR_HOURS,
+        forecast_step=TimeOffset.ONE_SECOND,
     )
     pipeline.load_multiple_cross_sections(cross_section_bounds=cross_section_bounds)
 
