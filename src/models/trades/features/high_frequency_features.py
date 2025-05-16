@@ -4,7 +4,7 @@ from typing import Dict, Any, List
 import polars as pl
 
 from core.currency import CurrencyPair
-from core.time_utils import Bounds, get_seconds_postfix
+from core.time_utils import Bounds, get_seconds_slug
 
 
 def compute_slippage(df_trades: pl.DataFrame) -> pl.DataFrame:
@@ -51,7 +51,7 @@ def compute_volume_imbalance(
     """Returns a dict of volume imbalance features computed using different offsets from end_date"""
 
     return {
-        f"volume_imbalance_{get_seconds_postfix(offset)}": (
+        f"volume_imbalance_{get_seconds_slug(offset)}": (
             df_trades
             .filter(pl.col("trade_time").is_between(bounds.end_exclusive - offset, bounds.end_exclusive))
             .select(pl.col("quote_sign").sum() / pl.col("quote_abs").sum())
@@ -67,7 +67,7 @@ def compute_slippage_features(
     """Compute slippage features based on quote_slippage_abs and quote_slippage_sign fields"""
 
     return {
-        f"slippage_imbalance_{get_seconds_postfix(offset)}": (
+        f"slippage_imbalance_{get_seconds_slug(offset)}": (
             df_trades
             .filter(
                 pl.col("trade_time").is_between(bounds.end_exclusive - offset, bounds.end_exclusive)
@@ -84,7 +84,7 @@ def compute_share_of_longs(
 ) -> Dict[str, float]:
     """Compute share of longs in overall number of trades"""
     return {
-        f"share_of_long_trades_{get_seconds_postfix(offset)}": (
+        f"share_of_long_trades_{get_seconds_slug(offset)}": (
             df_trades
             .filter(pl.col("trade_time").is_between(bounds.end_exclusive - offset, bounds.end_exclusive))
             .select(pl.col("is_long").sum() / pl.len())
@@ -99,7 +99,7 @@ def compute_log_return_features(
     """Compute log returns for different intervals before the prediction timestamp with different time_offsets"""
     # Overall log_returns over intervals
     overall_log_returns: Dict[str, float] = {
-        f"log_return_{get_seconds_postfix(offset)}": (
+        f"log_return_{get_seconds_slug(offset)}": (
             df_trades
             .filter(pl.col("trade_time").is_between(bounds.end_exclusive - offset, bounds.end_exclusive))
             .select((pl.col("price_last").last() / pl.col("price_first").first()).log())
@@ -115,7 +115,7 @@ def compute_alpha_powerlaw(
 ) -> Dict[str, float]:
     """Compute alpha using MLE estimate for alpha in Powerlaw"""
     return {
-        f"mle_alpha_powerlaw_{get_seconds_postfix(offset)}": (
+        f"mle_alpha_powerlaw_{get_seconds_slug(offset)}": (
             df_trades
             .filter(pl.col("trade_time").is_between(bounds.end_exclusive - offset, bounds.end_exclusive))
             # 1 + N / (sum log(q / q_min))

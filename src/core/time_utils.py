@@ -36,7 +36,7 @@ def _convert_to_dates(dates: pd.DatetimeIndex) -> List[date]:
     return [el.date() for el in dates]
 
 
-def get_seconds_postfix(td: timedelta) -> str:
+def get_seconds_slug(td: timedelta) -> str:
     return f"{td.total_seconds()}S"
 
 
@@ -68,6 +68,10 @@ def start_of_the_day(day: date) -> datetime:
 def end_of_the_day(day: date) -> datetime:
     """Converts date to datetime with 23:59:59:9999 time"""
     return start_of_the_day(day=day) + timedelta(days=1) - timedelta(microseconds=1)
+
+
+def format_date(day: date) -> str:
+    return day.strftime("%Y%m%d")
 
 
 @dataclass
@@ -145,9 +149,9 @@ class Bounds:
             end_exclusive=self.end_exclusive + rb_timedelta if rb_timedelta else self.end_exclusive,
         )
 
-    def iter_hours(self):
-        for lb in pd.date_range(self.day0, self.day1, freq="4h", inclusive="left"):
-            yield Bounds(lb, lb + timedelta(hours=4))
+    def iter_days(self):
+        for lb in pd.date_range(self.day0, self.day1, freq="1D", inclusive="both"):
+            yield Bounds.for_days(lb, lb + timedelta(days=1))
 
 
 class TimeOffset(Enum):
