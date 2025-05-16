@@ -1,5 +1,5 @@
 from pathlib import Path
 
-DATA_DIR: Path = Path("D:\data")
+DATA_DIR: Path = Path(r"D:\data")
 HIVE_TRADES: Path = DATA_DIR.joinpath("transformed").joinpath("trades")
-FEATURE_DIR: Path = DATA_DIR.joinpath("features")
+FEATURE_DIR: Path = DATA_DIR.joinpath("features").joinpath("HFT")

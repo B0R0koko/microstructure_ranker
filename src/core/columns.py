@@ -51,3 +51,4 @@ BINANCE_KLINES_COLS: List[str] = [
 ]
 
 SYMBOL: str = "symbol"
+SAMPLED_TIME: str = "sampled_time"

@@ -3,7 +3,7 @@ from enum import Enum
 from typing import Dict
 
 
-class DataType(Enum):
+class Feature(Enum):
     ASSET_RETURN = "asset_return"
     ASSET_HOLD_TIME = "asset_hold_time"
     FLOW_IMBALANCE = "flow_imbalance"

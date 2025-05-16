@@ -37,7 +37,10 @@ def _convert_to_dates(dates: pd.DatetimeIndex) -> List[date]:
 
 
 def get_seconds_slug(td: timedelta) -> str:
-    return f"{td.total_seconds()}S"
+    if td.total_seconds() < 1:
+        return f"{int(td.total_seconds() * 1000)}MS"
+    assert td.total_seconds() % 1 == 0, "Above second timedeltas must be a multiple of 1 second"
+    return f"{int(td.total_seconds())}S"
 
 
 def generate_daily_time_chunks(start_date: date, end_date: date) -> Optional[List[date]]:
@@ -152,6 +155,10 @@ class Bounds:
     def iter_days(self):
         for lb in pd.date_range(self.day0, self.day1, freq="1D", inclusive="both"):
             yield Bounds.for_days(lb, lb + timedelta(days=1))
+
+    def date_range(self):
+        for dt in pd.date_range(self.day0, self.day1, freq="1D", inclusive="both"):
+            yield dt.date()
 
 
 class TimeOffset(Enum):
