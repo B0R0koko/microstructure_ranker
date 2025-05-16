@@ -3,7 +3,7 @@ from typing import List, Dict, Any
 import polars as pl
 
 from core.columns import CLOSE_TIME, TAKER_BUY_QUOTE_ASSET_VOLUME, QUOTE_ASSET_VOLUME, CLOSE_PRICE, OPEN_PRICE
-from core.currency import CurrencyPair
+from core.currency_pair import CurrencyPair
 from core.time_utils import Bounds, TimeOffset
 
 

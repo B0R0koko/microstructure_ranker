@@ -13,7 +13,7 @@ import psutil
 from tqdm import tqdm
 
 from core.columns import TRADE_TIME, SYMBOL, PRICE
-from core.currency import CurrencyPair, get_cross_section_currencies
+from core.currency_pair import CurrencyPair, get_cross_section_currencies
 from core.paths import FEATURE_DIR, HIVE_TRADES
 from core.time_utils import Bounds, TimeOffset
 from models.trades.features.high_frequency_features import compute_features

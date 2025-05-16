@@ -7,7 +7,7 @@ import polars as pl
 from scrapy.utils.log import configure_logging
 
 from core.columns import SYMBOL
-from core.currency import CurrencyPair
+from core.currency_pair import CurrencyPair
 from preprocessing.pipelines.load_trades_to_hive import Trades2HiveUploader
 
 

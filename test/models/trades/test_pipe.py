@@ -6,7 +6,7 @@ import pandas as pd
 import polars as pl
 
 from core.columns import SYMBOL, TRADE_TIME, PRICE
-from core.currency import CurrencyPair
+from core.currency_pair import CurrencyPair
 from core.paths import HIVE_TRADES, FEATURE_DIR
 from core.time_utils import Bounds, TimeOffset
 from models.trades.features.features_27_11 import compute_features

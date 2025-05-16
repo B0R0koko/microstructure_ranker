@@ -12,7 +12,7 @@ import pandas as pd
 import polars as pl
 from tqdm import tqdm
 
-from core.currency import CurrencyPair
+from core.currency_pair import CurrencyPair
 
 
 def check_if_zipped_file_is_csv(file_path: str) -> bool:

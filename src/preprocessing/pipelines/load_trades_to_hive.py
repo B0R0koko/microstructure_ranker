@@ -4,7 +4,7 @@ from pathlib import Path
 import pandas as pd
 
 from core.columns import *
-from core.currency import CurrencyPair
+from core.currency_pair import CurrencyPair
 from preprocessing.uploader_to_hive import Uploader2Hive
 
 _INCLUDE_COLUMNS: List[str] = [PRICE, QUANTITY, TRADE_TIME, IS_BUYER_MAKER]

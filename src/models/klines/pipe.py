@@ -7,7 +7,7 @@ from tqdm import tqdm
 
 from core import EXCLUDED_SYMBOLS
 from core.columns import CLOSE_TIME, CLOSE_PRICE, OPEN_PRICE
-from core.currency import CurrencyPair
+from core.currency_pair import CurrencyPair
 from core.time_utils import Bounds
 from models.klines.features.features_29_02 import compute_features
 

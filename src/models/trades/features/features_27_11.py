@@ -2,7 +2,7 @@ from typing import Dict, Any, List
 
 import polars as pl
 
-from core.currency import CurrencyPair
+from core.currency_pair import CurrencyPair
 from core.time_utils import TimeOffset, Bounds
 
 

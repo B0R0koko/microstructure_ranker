@@ -8,7 +8,7 @@ import scrapy
 from scrapy import Request
 from scrapy.http import Response
 
-from core.currency import CurrencyPair
+from core.currency_pair import CurrencyPair
 from core.parser_enums import CollectMode
 from core.time_utils import Bounds, start_of_the_day
 

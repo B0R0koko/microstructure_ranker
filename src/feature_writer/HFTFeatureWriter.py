@@ -12,12 +12,12 @@ import polars as pl
 from tqdm import tqdm
 
 from core.columns import SYMBOL, TRADE_TIME, PRICE, QUANTITY, SAMPLED_TIME
-from core.currency import CurrencyPair
+from core.currency_pair import CurrencyPair
 from core.data_type import SamplingType, Feature
 from core.paths import HIVE_TRADES, FEATURE_DIR
 from core.time_utils import Bounds, format_date, get_seconds_slug
 
-WINDOWS: List[timedelta] = [
+SAMPLING_WINDOWS: List[timedelta] = [
     timedelta(milliseconds=500),
     timedelta(seconds=1),
     timedelta(seconds=2),
@@ -51,9 +51,9 @@ def aggregate_into_trades(df_ticks: pl.DataFrame) -> pl.DataFrame:
     return df_trades
 
 
-def write_feature(values: np.ndarray, feature: Feature, day: date, sampling_type: SamplingType, name: str) -> None:
+def write_feature(values: np.ndarray, day: date, sampling_type: SamplingType, subpath: Path) -> None:
     """Writes sampled np.ndarray with feature to {FEATURE_DIR}/HFT/20250101/MS500/asset_return/ADA"""
-    path: Path = FEATURE_DIR / format_date(day=day) / sampling_type.name / feature.value / name
+    path: Path = FEATURE_DIR / format_date(day=day) / sampling_type.name / subpath
     os.makedirs(path.parent, exist_ok=True)
     np.save(path, values)
 
@@ -70,7 +70,6 @@ def write_features_to_hive(sampled_features: pl.DataFrame, currency_pair: Curren
         compression="gzip",
         partition_cols=["date", "window", "currency_pair"],
         existing_data_behavior="overwrite_or_ignore"
-
     )
 
 
@@ -108,9 +107,7 @@ def feature_pipeline(
     )
 
     pbar = tqdm(
-        WINDOWS,
-        desc=f"Computing features for {currency_pair.name}@{str(bounds)}...",
-        position=2 + position,
+        SAMPLING_WINDOWS, desc=f"Computing features for {currency_pair.name}@{str(bounds)}...", position=2 + position,
         leave=False
     )
 
@@ -123,11 +120,7 @@ def feature_pipeline(
         sampled_features: pl.DataFrame = (
             df_trades
             .group_by_dynamic(
-                index_column=TRADE_TIME,
-                every=sampling_type.value,
-                period=window,
-                closed="right",
-                label="right",
+                index_column=TRADE_TIME, every=sampling_type.value, period=window, closed="right", label="right",
             )
             # Compute features sampled for this WINDOW at 500ms frequency
             .agg(
@@ -147,12 +140,16 @@ def feature_pipeline(
             )
         )
         # left join to desired time index to make sure that dimensions are correct
-        sampled_features: pl.DataFrame = df_index.join(
-            sampled_features, left_on=SAMPLED_TIME, right_on=TRADE_TIME, how="left"
+        sampled_features: pl.DataFrame = (
+            df_index
+            .join(sampled_features, left_on=SAMPLED_TIME, right_on=TRADE_TIME, how="left")
         )
-        # Save computed features to hive structure
-        write_features_to_hive(
-            sampled_features=sampled_features, currency_pair=currency_pair, window=window,
+        write_features_daily(
+            sampled_features=sampled_features,
+            currency_pair=currency_pair,
+            features=list(Feature),
+            window_td=window,
+            sampling_type=sampling_type,
         )
 
 
@@ -166,18 +163,26 @@ def write_features_daily(
     """Write sampled features to local filesystem"""
     # Resample feature by each day and save as np.ndarray to filesystem
     for (day,), daily_features in sampled_features.group_by_dynamic(
-            index_column="sampled_time", every=timedelta(days=1), period=timedelta(days=1),
+            index_column=SAMPLED_TIME, every=timedelta(days=1), period=timedelta(days=1),
     ):
+        # Write time index
+        write_feature(
+            values=daily_features[SAMPLED_TIME].to_numpy(),
+            day=day,
+            sampling_type=sampling_type,
+            subpath=Path("time")
+        )
+
         for feature in features:
             values: np.ndarray = daily_features[feature.value].to_numpy()
             assert len(values) == sampling_type.get_valid_size(), "Invalid shape for features"
             # Save feature to local filesystem
+            name: str = f"{feature.value}-{currency_pair.name}-{get_seconds_slug(window_td)}"
             write_feature(
                 values=values,
-                feature=feature,
                 sampling_type=sampling_type,
                 day=day,
-                name=f"{feature.value}-{currency_pair.name}-{get_seconds_slug(window_td)}",
+                subpath=Path(feature.value) / name,
             )
 
 
@@ -259,25 +264,6 @@ if __name__ == "__main__":
     bounds = Bounds.for_days(date(2024, 1, 1), date(2024, 2, 1))
 
     HFTFeatureWriter(bounds=bounds).run_in_multiprocessing_pool(
-        currency_pairs=[
-            CurrencyPair.from_string("BTC-USDT"),
-            CurrencyPair.from_string("ETH-USDT"),
-            CurrencyPair.from_string("XRP-USDT"),
-            CurrencyPair.from_string("BNB-USDT"),
-            CurrencyPair.from_string("SOL-USDT"),
-            CurrencyPair.from_string("DOGE-USDT"),
-            CurrencyPair.from_string("ADA-USDT"),
-            CurrencyPair.from_string("TRX-USDT"),
-            CurrencyPair.from_string("SUI-USDT"),
-            CurrencyPair.from_string("LINK-USDT"),
-            CurrencyPair.from_string("AVAX-USDT"),
-            CurrencyPair.from_string("XLM-USDT"),
-            CurrencyPair.from_string("SHIB-USDT"),
-            CurrencyPair.from_string("BCH-USDT"),
-            CurrencyPair.from_string("HBAR-USDT"),
-            CurrencyPair.from_string("LEO-USDT"),
-            CurrencyPair.from_string("TON-USDT"),
-            CurrencyPair.from_string("HYPE-USDT"),
-        ],
-        cpu_count=15
+        currency_pairs=TARGET_CURRENCIES,
+        cpu_count=20
     )

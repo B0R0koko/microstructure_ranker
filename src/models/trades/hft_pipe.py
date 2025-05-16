@@ -10,7 +10,7 @@ import polars as pl
 from tqdm import tqdm
 
 from core.columns import TRADE_TIME, SYMBOL, PRICE
-from core.currency import CurrencyPair
+from core.currency_pair import CurrencyPair
 from core.paths import HIVE_TRADES, FEATURE_DIR
 from core.time_utils import Bounds, start_of_the_day
 from models.trades.features.high_frequency_features import compute_features

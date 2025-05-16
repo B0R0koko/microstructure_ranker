@@ -4,7 +4,7 @@ from typing import List
 
 from scrapy.crawler import CrawlerProcess
 
-from core.currency import CurrencyPair, collect_all_usdm_currency_pairs
+from core.currency_pair import CurrencyPair, collect_all_usdm_currency_pairs
 from core.parser_enums import CollectMode
 from core.time_utils import Bounds
 from data_collection.datavision.parsers.binance.FuturesTradeParser import BinanceFuturesTradeParser

@@ -4,7 +4,7 @@ from typing import Optional, Dict, Any
 
 import scrapy
 
-from core.currency import CurrencyPair
+from core.currency_pair import CurrencyPair
 from data_collection.datavision.parser import DataParser
 
 

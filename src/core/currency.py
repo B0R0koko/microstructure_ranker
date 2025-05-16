@@ -1,79 +1,32 @@
-import os
-import re
-from dataclasses import dataclass
-from datetime import date, datetime
-from pathlib import Path
-from typing import List, Dict, Any, Optional
-
-import requests
-
-from core.time_utils import Bounds
+import functools
+from enum import Enum
 
 
-@dataclass
-class CurrencyPair:
-    base: str
-    term: str
+@functools.total_ordering
+class Currency(Enum):
+    BTC = 1
+    ETH = 2
+    XRP = 3
+    BNB = 4
+    SOL = 5
+    DOGE = 6
+    ADA = 7
+    TRX = 8
+    SUI = 9
+    LINK = 10
+    AVAX = 11
+    XLM = 12
+    SHIB = 13
+    BCH = 14
+    HBAR = 15
+    USDT = 19
+    BUSD = 20
+    TUSD = 21
+    USDC = 22
+    FDUSD = 23
 
-    @classmethod
-    def from_string(cls, symbol: str):
-        """Parse CurrencyPair from string formatted like this: ADA-USDT"""
-        base, term = symbol.split("-")
-        return cls(base=base, term=term)
+    def __lt__(self, other):
+        return str(self) < str(other)
 
-    def __str__(self) -> str:
-        return f"{self.base}-{self.term}"
-
-    @property
-    def name(self) -> str:
-        return f"{self.base}-{self.term}"
-
-    @property
-    def binance_name(self) -> str:
-        return f"{self.base}{self.term}"
-
-    def __hash__(self) -> int:
-        return hash((self.base, self.term))
-
-
-def collect_all_spot_currency_pairs() -> List[CurrencyPair]:
-    """Collect a set of all CurrencyPairs traded on Binance"""
-    resp = requests.get("https://api.binance.com/api/v3/exchangeInfo")
-    data: Dict[str, Any] = resp.json()
-    return [
-        CurrencyPair(base=entry["baseAsset"], term=entry["quoteAsset"]) for entry in data["symbols"]
-    ]
-
-
-def collect_all_usdm_currency_pairs() -> List[CurrencyPair]:
-    """Collect a set of all CurrencyPairs traded on BINANCE_USDM"""
-    resp = requests.get("https://fapi.binance.com/fapi/v1/exchangeInfo")
-    data: Dict[str, Any] = resp.json()
-    return [
-        CurrencyPair(base=entry["baseAsset"], term=entry["quoteAsset"]) for entry in data["symbols"]
-    ]
-
-
-def get_cross_section_currencies(hive_dir: Path, bounds: Bounds) -> List[CurrencyPair]:
-    matched_dirs: List[str] = []
-
-    for directory in os.listdir(hive_dir):
-        match: Optional[re.Match[str]] = re.search(string=directory, pattern=r"(\d{4}-\d{2}-\d{2})")
-        date_matched: Optional[str] = match.group(1) if match else None
-        if date_matched is None:
-            continue
-
-        dir_date: date = datetime.strptime(date_matched, "%Y-%m-%d").date()
-
-        if bounds.contain_days(day=dir_date):
-            matched_dirs.append(directory)
-
-    all_currency_pairs: set[CurrencyPair] = set()
-
-    for directory in matched_dirs:
-        symbol_directories: List[str] = os.listdir(hive_dir.joinpath(directory))
-        all_currency_pairs |= set(
-            CurrencyPair.from_string(symbol=directory.split("=")[1]) for directory in symbol_directories
-        )
-
-    return list(all_currency_pairs)
+    def is_stable_coin(self) -> bool:
+        return self in (Currency.BUSD, Currency.USDT, Currency.TUSD, Currency.FDUSD, Currency.USDC)
