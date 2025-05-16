@@ -14,6 +14,7 @@ from core.time_utils import Bounds
 from ml_base.enums import DatasetType
 from ml_base.sample import Sample, SampleParams
 from models.prediction.build_dataset import BuildDataset, get_target_currencies
+from models.prediction.columns import COL_CURRENCY_INDEX
 
 _BASE_PARAMS: Dict[str, Any] = {
     "objective": "mse",
@@ -35,7 +36,7 @@ class PrimaryPricePrediction:
             bounds=self.bounds,
             target_currencies=self.target_currencies,
             sample_params=self.sample_params,
-            forecast_step=timedelta(seconds=5),
+            forecast_step=timedelta(minutes=5),
         )
         return builder.create_dataset()
 
@@ -61,11 +62,13 @@ class PrimaryPricePrediction:
         sample: Sample = self.create_sample()
         booster: Booster = self.train_model(sample=sample)
 
+        data: pd.DataFrame = sample.get_data(ds_type=DatasetType.TEST)
+        label: pd.Series = sample.get_label(ds_type=DatasetType.TEST)
+
         for currency in self.target_currencies:
-            data: pd.DataFrame = sample.get_data(ds_type=DatasetType.TEST)
-            y_pred: np.ndarray = booster.predict(data, num_iteration=booster.best_iteration)  # type:ignore
-            label: pd.Series = sample.get_label(ds_type=DatasetType.TEST)
-            logging.info("Currency %s R2 = %s", currency.name, r2_score(y_pred=y_pred, y_true=label))
+            mask = data[COL_CURRENCY_INDEX] == currency.value
+            y_pred: np.ndarray = booster.predict(data[mask], num_iteration=booster.best_iteration)  # type:ignore
+            logging.info("Currency %s R2 = %s", currency.name, r2_score(y_pred=y_pred, y_true=label[mask]))
 
 
 def main():
