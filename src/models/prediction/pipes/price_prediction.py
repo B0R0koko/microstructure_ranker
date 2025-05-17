@@ -26,17 +26,23 @@ _BASE_PARAMS: Dict[str, Any] = {
 
 class PrimaryPricePrediction:
 
-    def __init__(self, bounds: Bounds, sample_params: SampleParams, target_currencies: List[Currency]):
+    def __init__(
+            self, bounds: Bounds,
+            sample_params: SampleParams,
+            target_currencies: List[Currency],
+            forecast_steps: timedelta,
+    ):
         self.bounds: Bounds = bounds
         self.sample_params: SampleParams = sample_params
         self.target_currencies: List[Currency] = target_currencies
+        self.forecast_steps: timedelta = forecast_steps
 
     def create_sample(self) -> Sample:
         builder: BuildDataset = BuildDataset(
             bounds=self.bounds,
             target_currencies=self.target_currencies,
             sample_params=self.sample_params,
-            forecast_step=timedelta(minutes=5),
+            forecast_step=self.forecast_steps,
         )
         return builder.create_dataset()
 
@@ -70,15 +76,18 @@ class PrimaryPricePrediction:
             y_pred: np.ndarray = booster.predict(data[mask], num_iteration=booster.best_iteration)  # type:ignore
             logging.info("Currency %s R2 = %s", currency.name, r2_score(y_pred=y_pred, y_true=label[mask]))
 
+        return booster
+
 
 def main():
     configure_logging()
     pipe = PrimaryPricePrediction(
-        bounds=Bounds.for_days(date(2024, 1, 1), date(2024, 1, 5)),
+        bounds=Bounds.for_days(date(2024, 1, 5), date(2024, 1, 10)),
         sample_params=SampleParams(
             train_share=.7, validation_share=.15, test_share=.15,
         ),
         target_currencies=get_target_currencies(),
+        forecast_steps=timedelta(seconds=1)
     )
     pipe.build_best_model()
 

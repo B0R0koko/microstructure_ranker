@@ -153,7 +153,7 @@ class BuildDataset:
 def run_test():
     configure_logging()
     bounds: Bounds = Bounds.for_days(
-        date(2024, 1, 1), date(2024, 1, 5)
+        date(2024, 1, 5), date(2024, 1, 12)
     )
     build = BuildDataset(
         bounds=bounds,
@@ -161,7 +161,7 @@ def run_test():
         sample_params=SampleParams(
             train_share=.7, validation_share=.15, test_share=.15
         ),
-        forecast_step=timedelta(seconds=5)
+        forecast_step=timedelta(seconds=2)
     )
     build.create_dataset()
 

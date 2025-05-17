@@ -16,7 +16,11 @@ def read_scalar(
 ) -> np.ndarray:
     """Read np.ndarray from file"""
     path: Path = FEATURE_DIR / "HFT" / format_date(day=day) / sampling_type.name / subpath
-    return np.load(str(path) + ".npy")
+    values: np.ndarray = np.load(str(path) + ".npy")
+
+    assert len(values) == sampling_type.get_valid_size(), \
+        f"Array size {len(values)} didn't match expected {sampling_type.get_valid_size()}"
+    return values
 
 
 def multi_day_ts(bounds: Bounds, get_day_ts: Callable[[date], np.ndarray]) -> np.ndarray:
