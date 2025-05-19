@@ -20,6 +20,6 @@ SETTINGS = dict(
     DOWNLOAD_TIMEOUT=60 * 60 * 24,
 
     ITEM_PIPELINES={
-        "data_collection.datavision.pipelines.zip_pipeline.ZipPipeline": 1,
+        "historic_md.binance.pipelines.zip_pipeline.ZipPipeline": 1,
     },
 )

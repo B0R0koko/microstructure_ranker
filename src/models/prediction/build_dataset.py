@@ -6,7 +6,7 @@ import numpy as np
 import pandas as pd
 from scrapy.utils.log import configure_logging
 
-from core.currency import Currency
+from core.currency import Currency, get_target_currencies
 from core.currency_pair import CurrencyPair
 from core.data_type import SamplingType
 from core.feature_set import FeatureSet
@@ -15,12 +15,8 @@ from feature_writer.HFTFeatureWriter import SAMPLING_WINDOWS
 from ml_base.enums import DatasetType
 from ml_base.sample import SampleParams, Sample, concat_samples
 from models.prediction.columns import COL_CURRENCY_INDEX, COL_OUTPUT
-from models.prediction.features import read_returns, read_slippage_imbalance, read_flow_imbalance, read_powerlaw_alpha, \
-    read_share_long_trades, read_hold_time, shift, read_index
-
-
-def get_target_currencies() -> List[Currency]:
-    return [currency for currency in Currency if not currency.is_stable_coin()]
+from models.prediction.features import read_slippage_imbalance, read_flow_imbalance, read_powerlaw_alpha, \
+    read_share_long_trades, shift, read_index, read_returns_adj
 
 
 class BuildDataset:
@@ -54,10 +50,7 @@ class BuildDataset:
 
         for window in SAMPLING_WINDOWS:
             # Read sampled features for each SAMPLING_WINDOW
-            features[f"{prefix}-asset_return-{get_seconds_slug(window)}"] = read_returns(
-                bounds=self.bounds, currency_pair=currency_pair, window=window
-            )
-            features[f"{prefix}-hold_time-{get_seconds_slug(window)}"] = read_hold_time(
+            features[f"{prefix}-asset_return_adj-{get_seconds_slug(window)}"] = read_returns_adj(
                 bounds=self.bounds, currency_pair=currency_pair, window=window
             )
             features[f"{prefix}-slippage_imbalance-{get_seconds_slug(window)}"] = read_slippage_imbalance(
@@ -79,13 +72,9 @@ class BuildDataset:
         """Reads output return in pips with forecast step"""
         logging.info("Reading output for %s", currency.name)
         currency_pair: CurrencyPair = CurrencyPair(base=currency, term=Currency.USDT)
-        returns: np.ndarray = read_returns(
+        returns_adj: np.ndarray = read_returns_adj(
             bounds=self.bounds, currency_pair=currency_pair, window=self.forecast_step
         )
-        hold_time_sec: np.ndarray = read_hold_time(
-            bounds=self.bounds, currency_pair=currency_pair, window=self.forecast_step
-        )
-        returns_adj: np.ndarray = returns / hold_time_sec
         shifted_returns: np.ndarray = shift(
             returns_adj, n=-int(self.forecast_step / SamplingType.MS500.value)
         )
@@ -132,7 +121,7 @@ class BuildDataset:
         )
 
         df: pd.DataFrame = pd.DataFrame(features)
-        df = df.dropna(subset=["output"])  # remove observations with missing targets
+        df = df.dropna(subset=[COL_OUTPUT])  # remove observations with missing targets
         return self.split_and_wrap_into_samples(df=df, feature_set=feature_set)
 
     def create_dataset(self) -> Sample:
@@ -153,7 +142,7 @@ class BuildDataset:
 def run_test():
     configure_logging()
     bounds: Bounds = Bounds.for_days(
-        date(2024, 1, 5), date(2024, 1, 12)
+        date(2024, 1, 1), date(2024, 1, 5)
     )
     build = BuildDataset(
         bounds=bounds,
@@ -161,7 +150,7 @@ def run_test():
         sample_params=SampleParams(
             train_share=.7, validation_share=.15, test_share=.15
         ),
-        forecast_step=timedelta(seconds=2)
+        forecast_step=timedelta(seconds=5)
     )
     build.create_dataset()
 

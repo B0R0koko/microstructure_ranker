@@ -13,13 +13,13 @@ from core.currency import Currency
 from core.time_utils import Bounds
 from ml_base.enums import DatasetType
 from ml_base.sample import Sample, SampleParams
-from models.prediction.build_dataset import BuildDataset, get_target_currencies
+from models.prediction.build_dataset import BuildDataset
 from models.prediction.columns import COL_CURRENCY_INDEX
 
 _BASE_PARAMS: Dict[str, Any] = {
     "objective": "mse",
     "max_depth": 5,
-    "n_estimators": 100,
+    "n_estimators": 1000,
     "num_threads": os.cpu_count()
 }
 
@@ -59,7 +59,7 @@ class PrimaryPricePrediction:
             valid_sets=[train, validation],
             valid_names=["train", "validation"],
             callbacks=[
-                early_stopping(stopping_rounds=50, min_delta=.01, verbose=False),
+                early_stopping(stopping_rounds=50, min_delta=.01, verbose=True),
             ]
         )
         return booster
@@ -76,17 +76,27 @@ class PrimaryPricePrediction:
             y_pred: np.ndarray = booster.predict(data[mask], num_iteration=booster.best_iteration)  # type:ignore
             logging.info("Currency %s R2 = %s", currency.name, r2_score(y_pred=y_pred, y_true=label[mask]))
 
+        logging.info(
+            "\n\nFeature importances %s",
+            pd.DataFrame({
+                "feature": booster.feature_name(),
+                "feature_importance": booster.feature_importance(importance_type="gain")
+            }).sort_values("feature_importance", ascending=False).head(20)
+        )
+
         return booster
 
 
 def main():
     configure_logging()
     pipe = PrimaryPricePrediction(
-        bounds=Bounds.for_days(date(2024, 1, 5), date(2024, 1, 10)),
+        bounds=Bounds.for_days(date(2024, 1, 10), date(2024, 2, 1)),
         sample_params=SampleParams(
             train_share=.7, validation_share=.15, test_share=.15,
         ),
-        target_currencies=get_target_currencies(),
+        target_currencies=[
+            Currency.BTC, Currency.ETH, Currency.ADA
+        ],
         forecast_steps=timedelta(seconds=1)
     )
     pipe.build_best_model()

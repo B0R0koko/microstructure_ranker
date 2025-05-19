@@ -4,11 +4,12 @@ from typing import List
 
 from scrapy.crawler import CrawlerProcess
 
-from core.currency_pair import CurrencyPair, collect_all_usdm_currency_pairs
+from core.currency import get_target_currencies, Currency
+from core.currency_pair import CurrencyPair
 from core.parser_enums import CollectMode
 from core.time_utils import Bounds
-from data_collection.datavision.parsers.binance.FuturesTradeParser import BinanceFuturesTradeParser
-from data_collection.datavision.settings import SETTINGS
+from data_collection.parsers.binance.FuturesTradeParser import BinanceFuturesTradeParser
+from data_collection.settings import SETTINGS
 
 
 def main():
@@ -19,9 +20,8 @@ def main():
     )
     process: CrawlerProcess = CrawlerProcess(settings=SETTINGS)
     # Only collect data for USDT paired currency_pairs
-    currency_pairs: List[CurrencyPair] = collect_all_usdm_currency_pairs()
     usdt_pairs: List[CurrencyPair] = [
-        currency_pair for currency_pair in currency_pairs if currency_pair.term.endswith("USDT")
+        CurrencyPair(base=currency, term=Currency.USDT) for currency in get_target_currencies()
     ]
 
     process.crawl(

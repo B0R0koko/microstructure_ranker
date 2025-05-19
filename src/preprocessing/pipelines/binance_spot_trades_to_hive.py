@@ -10,7 +10,7 @@ from preprocessing.uploader_to_hive import Uploader2Hive
 _INCLUDE_COLUMNS: List[str] = [PRICE, QUANTITY, TRADE_TIME, IS_BUYER_MAKER]
 
 
-class Trades2HiveUploader(Uploader2Hive):
+class BinanceSpot2Hive(Uploader2Hive):
 
     def __init__(self, zipped_data_dir: Path, output_dir: Path):
         super().__init__(

@@ -5,6 +5,7 @@ from typing import Dict
 
 class Feature(Enum):
     ASSET_RETURN = "asset_return"
+    ASSET_RETURN_ADJ = "asset_return_adj"
     ASSET_HOLD_TIME = "asset_hold_time"
     FLOW_IMBALANCE = "flow_imbalance"
     SLIPPAGE_IMBALANCE = "slippage_imbalance"

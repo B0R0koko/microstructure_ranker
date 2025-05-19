@@ -5,10 +5,10 @@ from urllib.parse import urlencode
 from core.currency_pair import CurrencyPair
 from core.parser_enums import CollectMode, KlineInterval
 from core.time_utils import Bounds
-from data_collection.datavision.parser import DataParser, BINANCE_S3
+from data_collection.parsers.binance.BinanceParser import BinanceParser, BINANCE_S3
 
 
-class KlineParser(DataParser):
+class KlineParser(BinanceParser):
     name: str = "kline_parser"
 
     def __init__(

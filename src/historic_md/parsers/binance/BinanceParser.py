@@ -51,7 +51,7 @@ def get_zip_file_url(href: str) -> str:
     return f"{BINANCE_DATAVISION}/{href}"
 
 
-class DataParser(ABC, scrapy.Spider):
+class BinanceParser(ABC, scrapy.Spider):
 
     def __init__(
             self,

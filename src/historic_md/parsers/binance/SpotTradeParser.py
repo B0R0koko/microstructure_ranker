@@ -5,10 +5,10 @@ from urllib.parse import urlencode
 from core.currency_pair import CurrencyPair
 from core.parser_enums import CollectMode
 from core.time_utils import Bounds
-from data_collection.datavision.parser import DataParser, BINANCE_S3
+from data_collection.parsers.binance.BinanceParser import BinanceParser, BINANCE_S3
 
 
-class BinanceSpotTradeParser(DataParser):
+class BinanceSpotTradeParser(BinanceParser):
     name: str = "trades_parser"
 
     def __init__(

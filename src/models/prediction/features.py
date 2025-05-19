@@ -38,13 +38,25 @@ def statistic_name(feature: Feature, currency_pair: CurrencyPair, window: timede
 
 
 def read_returns(bounds: Bounds, currency_pair: CurrencyPair, window: timedelta) -> np.ndarray:
-    """Reads features like this D:/data/features/HFT/20240102/MS500/asset_hold_time/asset_return-ADA-USDT-0.5S"""
+    """Reads features like this D:/data/features/HFT/20240102/MS500/asset_return/asset_return-ADA-USDT-0.5S"""
     stat_name: str = statistic_name(feature=Feature.ASSET_RETURN, currency_pair=currency_pair, window=window)
     return multi_day_ts(
         bounds=bounds,
         get_day_ts=lambda day: read_scalar(
             day=day,
             subpath=Path(Feature.ASSET_RETURN.value) / stat_name,
+        )
+    )
+
+
+def read_returns_adj(bounds: Bounds, currency_pair: CurrencyPair, window: timedelta) -> np.ndarray:
+    """Reads features like this D:/data/features/HFT/20240102/MS500/asset_return_adj/asset_return_adj-ADA-USDT-0.5S"""
+    stat_name: str = statistic_name(feature=Feature.ASSET_RETURN_ADJ, currency_pair=currency_pair, window=window)
+    return multi_day_ts(
+        bounds=bounds,
+        get_day_ts=lambda day: read_scalar(
+            day=day,
+            subpath=Path(Feature.ASSET_RETURN_ADJ.value) / stat_name,
         )
     )
 
