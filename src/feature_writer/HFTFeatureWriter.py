@@ -12,9 +12,10 @@ import polars as pl
 from tqdm import tqdm
 
 from core.columns import SYMBOL, TRADE_TIME, PRICE, QUANTITY, SAMPLED_TIME
+from core.currency import Currency, get_target_currencies
 from core.currency_pair import CurrencyPair
 from core.data_type import SamplingType, Feature
-from core.paths import HIVE_TRADES, FEATURE_DIR
+from core.paths import FEATURE_DIR, SPOT_TRADES, USDM_TRADES
 from core.time_utils import Bounds, format_date, get_seconds_slug
 
 SAMPLING_WINDOWS: List[timedelta] = [
@@ -53,7 +54,7 @@ def aggregate_into_trades(df_ticks: pl.DataFrame) -> pl.DataFrame:
 
 def write_feature(values: np.ndarray, day: date, sampling_type: SamplingType, subpath: Path) -> None:
     """Writes sampled np.ndarray with feature to {FEATURE_DIR}/HFT/20250101/MS500/asset_return/ADA"""
-    path: Path = FEATURE_DIR / format_date(day=day) / sampling_type.name / subpath
+    path: Path = FEATURE_DIR / "HFT" / format_date(day=day) / sampling_type.name / subpath
     os.makedirs(path.parent, exist_ok=True)
     np.save(path, values)
 
@@ -98,13 +99,6 @@ def feature_pipeline(
     df_trades = df_trades.with_columns(
         quote_slippage_sign=pl.col("quote_slippage_abs") * pl.col("quantity_sign").sign()
     )
-    # Add additional lags to be able to compute outer returns (lb-eps; rb+eps) returns
-    df_trades = df_trades.with_columns(
-        price_last_lag=pl.col("price_last").shift(1),
-        trade_time_lag=pl.col("trade_time").shift(1),
-        price_first_neg_lag=pl.col("price_first").shift(-1),
-        trade_time_neg_lag=pl.col("trade_time").shift(-1)
-    )
 
     pbar = tqdm(
         SAMPLING_WINDOWS, desc=f"Computing features for {currency_pair.name}@{str(bounds)}...", position=2 + position,
@@ -124,10 +118,10 @@ def feature_pipeline(
             )
             # Compute features sampled for this WINDOW at 500ms frequency
             .agg(
-                asset_return=(pl.col("price_first_neg_lag").last() / pl.col("price_last_lag").first() - 1) * 1e4,
+                asset_return=(pl.col("price_last").last() / pl.col("price_first").first() - 1) * 1e4,
                 asset_hold_time=(
-                        (pl.col("trade_time_neg_lag").last() - pl.col(
-                            "trade_time_lag").first()).dt.total_nanoseconds() / 1e9
+                        (pl.col("trade_time").last() - pl.col("trade_time").first()).dt.total_nanoseconds()
+                        / 1e9
                 ),
                 flow_imbalance=pl.col("quote_sign").sum() / pl.col("quote_abs").sum(),
                 slippage_imbalance=pl.col("quote_slippage_sign").sum() / pl.col("quote_slippage_abs").sum(),
@@ -147,7 +141,13 @@ def feature_pipeline(
         write_features_daily(
             sampled_features=sampled_features,
             currency_pair=currency_pair,
-            features=list(Feature),
+            features=[
+                Feature.ASSET_RETURN,
+                Feature.ASSET_HOLD_TIME,
+                Feature.POWERLAW_ALPHA,
+                Feature.SHARE_OF_LONG_TRADES,
+                Feature.SLIPPAGE_IMBALANCE,
+            ],
             window_td=window,
             sampling_type=sampling_type,
         )
@@ -190,7 +190,9 @@ class HFTFeatureWriter:
     """Define HFT feature writer that will sample MS500 features using Polars group_by_dynamic"""
 
     def __init__(self, bounds: Bounds, sampling_type: SamplingType = SamplingType.MS500):
-        self._hive = pl.scan_parquet(HIVE_TRADES, hive_partitioning=True)
+        self._hive = pl.scan_parquet(SPOT_TRADES, hive_partitioning=True)  # hive structure for BINANCE_SPOT data
+        self._usdm_hive = pl.scan_parquet(USDM_TRADES, hive_partitioning=True)  # hive structure for BINANCE_USDM data
+
         self.bounds: Bounds = bounds
         self.sampling_type: SamplingType = sampling_type
 
@@ -264,6 +266,8 @@ if __name__ == "__main__":
     bounds = Bounds.for_days(date(2024, 1, 1), date(2024, 2, 1))
 
     HFTFeatureWriter(bounds=bounds).run_in_multiprocessing_pool(
-        currency_pairs=TARGET_CURRENCIES,
+        currency_pairs=[
+            CurrencyPair(base=currency, term=Currency.USDT) for currency in get_target_currencies()
+        ],
         cpu_count=20
     )
