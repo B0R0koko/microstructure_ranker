@@ -42,3 +42,10 @@ class FeatureSet:
         new_categorical_regressors: List[str] = list(set(self.categorical) - set(regressors))
 
         return FeatureSet(regressors=new_regressors, categorical=new_categorical_regressors, target=self.target)
+
+    def __eq__(self, other) -> bool:
+        return (
+                self.regressors == other.regressors and
+                self.categorical == other.categorical and
+                self.target == other.target
+        )

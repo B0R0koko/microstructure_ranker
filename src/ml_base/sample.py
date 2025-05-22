@@ -1,3 +1,4 @@
+import gc
 import logging
 from typing import Optional, Dict, List
 
@@ -5,19 +6,26 @@ import lightgbm as lgb
 import pandas as pd
 
 from core.feature_set import FeatureSet
+from core.time_utils import Bounds
 from ml_base.enums import DatasetType
 
 
 class MLDataset:
 
     def __init__(
-            self, ds_type: DatasetType, data: pd.DataFrame, label: pd.Series,
-            feature_set: FeatureSet, eval_data: Optional[pd.DataFrame] = None,
+            self,
+            ds_type: DatasetType,
+            data: pd.DataFrame,
+            label: pd.Series,
+            feature_set: FeatureSet,
+            name: str,
+            eval_data: Optional[pd.DataFrame] = None,
     ):
         self.ds_type: DatasetType = ds_type
         self.data: pd.DataFrame = data
         self.label: pd.Series = label
         self.feature_set: FeatureSet = feature_set
+        self.name: str = name
         # eval_data is optional, used for evaluation only
         self.eval_data: Optional[pd.DataFrame] = eval_data
 
@@ -28,14 +36,33 @@ class MLDataset:
             label=self.label,
             categorical_feature=self.feature_set.categorical,
             reference=reference,
-            free_raw_data=False
+            free_raw_data=True
         ).construct()
+
+    def is_empty(self) -> bool:
+        return self.data.empty
+
+    def describe(self) -> None:
+        logging.info("Dataset %s shape %s\n\n", self.name, self.data.shape)
+
+    def add_dataset(self, dataset: "MLDataset") -> None:
+        """concatenates all data inplace and gc.collect() dataset passed to the function"""
+        assert self.feature_set == dataset.feature_set, "FeatureSet must be the same for merged MLDatasets"
+        self.data = pd.concat([self.data, dataset.data])
+        self.label = pd.concat([self.label, dataset.label])
+
+        if self.eval_data is not None and dataset.eval_data is not None:
+            self.eval_data = pd.concat([self.eval_data, dataset.eval_data])
+
+        del dataset
+        gc.collect()
 
 
 class Sample:
 
-    def __init__(self, datasets: Dict[DatasetType, MLDataset], require_lgb: bool = False):
+    def __init__(self, datasets: Dict[DatasetType, MLDataset], name: str, require_lgb: bool = False):
         self.datasets: Dict[DatasetType, MLDataset] = datasets
+        self.name: str = name
 
         if require_lgb:
             # Create reference to train dataset
@@ -50,6 +77,12 @@ class Sample:
     @property
     def dataset_types(self) -> List[DatasetType]:
         return list(self.datasets.keys())
+
+    def describe(self) -> None:
+        for ds_type, dataset in self.datasets.items():
+            nan_stats: pd.Series = dataset.data.isna().sum().sort_values(ascending=False)
+            logging.info("Shape for %s@%s %s\n", self.name, ds_type.name, dataset.data.shape)
+            logging.info("Nancount for %s@%s\n\n%s\n", self.name, ds_type.name, nan_stats)
 
     def get_dataset(self, ds_type: DatasetType) -> MLDataset:
         assert ds_type in self.dataset_types, f"{ds_type} not in {self.dataset_types}"
@@ -69,7 +102,9 @@ class Sample:
         return self.datasets[ds_type].eval_data
 
     @classmethod
-    def from_pandas_datasets(cls, datasets: Dict[DatasetType, pd.DataFrame], feature_set: FeatureSet) -> "Sample":
+    def from_pandas_datasets(
+            cls, datasets: Dict[DatasetType, pd.DataFrame], feature_set: FeatureSet, name: str
+    ) -> "Sample":
         ml_datasets: Dict[DatasetType, MLDataset] = {
             # Create MLDataset from passed in inferred or hard-coded FeatureSet
             ds_type: MLDataset(
@@ -77,12 +112,13 @@ class Sample:
                 data=df[feature_set.regressors],
                 label=df[feature_set.target],
                 feature_set=feature_set,
-                eval_data=df[feature_set.eval_fields] if feature_set.eval_fields else None
+                eval_data=df[feature_set.eval_fields] if feature_set.eval_fields else None,
+                name="merged_dataset"
             )
             for ds_type, df in datasets.items()
             if not df.empty
         }
-        return cls(datasets=ml_datasets, require_lgb=False)
+        return cls(datasets=ml_datasets, name=name, require_lgb=False)
 
 
 def concat_datasets(dss: List[MLDataset], ds_type: DatasetType) -> MLDataset:
@@ -97,7 +133,8 @@ def concat_datasets(dss: List[MLDataset], ds_type: DatasetType) -> MLDataset:
         data=merged_data,
         label=merged_label,
         feature_set=dss[0].feature_set,
-        eval_data=pd.concat(list_eval_data) if len(list_eval_data) > 0 else None
+        eval_data=pd.concat(list_eval_data) if len(list_eval_data) > 0 else None,
+        name="merged_dataset"
     )
 
 
@@ -111,7 +148,7 @@ def concat_samples(samples: List[Sample], require_lgb: bool = True) -> Sample:
         dataset: MLDataset = concat_datasets(dss, ds_type=ds_type)
         datasets[ds_type] = dataset
 
-    return Sample(datasets=datasets, require_lgb=require_lgb)
+    return Sample(datasets=datasets, name="", require_lgb=require_lgb)
 
 
 class SampleParams:
@@ -136,3 +173,6 @@ class SampleParams:
             # Filter out all empty splits
             if not data.empty
         }
+
+    def return_bounds(self, bounds: Bounds) -> Bounds:
+        """Returns bounds for a given DatasetType from shares passed in to SampleParams"""

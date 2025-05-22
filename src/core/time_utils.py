@@ -126,7 +126,10 @@ class Bounds:
 
         while True:
             rb: datetime = lb + interval
-            intervals.append(Bounds(start_inclusive=lb, end_exclusive=rb))  # create new overlapping sub-Bounds
+            # create new overlapping sub-Bounds
+            intervals.append(
+                Bounds(start_inclusive=lb, end_exclusive=min(rb - timedelta(microseconds=1), self.end_exclusive))
+            )
             lb += step
 
             if rb >= self.end_exclusive:
@@ -152,13 +155,12 @@ class Bounds:
             end_exclusive=self.end_exclusive + rb_timedelta if rb_timedelta else self.end_exclusive,
         )
 
-    def iter_days(self):
-        for lb in pd.date_range(self.day0, self.day1, freq="1D", inclusive="both"):
-            yield Bounds.for_days(lb, lb + timedelta(days=1))
-
     def date_range(self):
         for dt in pd.date_range(self.day0, self.day1, freq="1D", inclusive="both"):
             yield dt.date()
+
+    def __eq__(self, other) -> bool:
+        return self.start_inclusive == other.start_inclusive and self.end_exclusive == other.end_exclusive
 
 
 class TimeOffset(Enum):
@@ -183,9 +185,10 @@ class TimeOffset(Enum):
 
 
 if __name__ == "__main__":
-    bounds: Bounds = Bounds(
-        start_inclusive=start_of_the_day(date.today()),
-        end_exclusive=end_of_the_day(date.today()),
+    bounds: Bounds = Bounds.for_days(
+        start_inclusive=date(2025, 1, 1),
+        end_exclusive=date(2025, 2, 1),
     )
 
-    print(bounds)
+    sub_bounds: List[Bounds] = bounds.generate_overlapping_bounds(step=timedelta(days=3), interval=timedelta(days=3))
+    print(sub_bounds)
