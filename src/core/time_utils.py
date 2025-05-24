@@ -1,6 +1,6 @@
 from calendar import monthrange
 from dataclasses import dataclass
-from datetime import date, timedelta, datetime, time
+from datetime import date, timedelta, time, datetime
 from enum import Enum
 from typing import Optional, List
 
@@ -16,20 +16,6 @@ def get_last_day_month(date_to_round: date) -> date:
 def get_first_day_month(date_to_round: date) -> date:
     """Returns the first day of the month"""
     return date(year=date_to_round.year, month=date_to_round.month, day=1)
-
-
-def generate_month_time_chunks(start_date: date, end_date: date) -> Optional[List[date]]:
-    """Generate a list of months that lie entirely within given interval of start and end dates"""
-    date_months: List[date] = [
-        _date.date() for _date in pd.date_range(start_date, end_date, freq="MS", inclusive="both").tolist()
-    ]
-    # check if the last value is correct
-    if not date_months:
-        return
-
-    if date_months[-1] == get_first_day_month(end_date):
-        date_months.pop(-1)
-    return date_months
 
 
 def _convert_to_dates(dates: pd.DatetimeIndex) -> List[date]:
@@ -190,5 +176,4 @@ if __name__ == "__main__":
         end_exclusive=date(2025, 2, 1),
     )
 
-    sub_bounds: List[Bounds] = bounds.generate_overlapping_bounds(step=timedelta(days=3), interval=timedelta(days=3))
-    print(sub_bounds)
+    print(list(bounds.date_range()))

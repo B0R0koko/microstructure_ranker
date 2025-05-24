@@ -13,12 +13,8 @@ from historic_md.parsers.binance.BinanceParser import BinanceParser, BINANCE_S3
 from historic_md.settings import SETTINGS
 
 
-class BinanceSpotTradeParser(BinanceParser):
+class BinanceUSDML1Parser(BinanceParser):
     name: str = "trades_parser"
-
-    custom_settings = {
-        "ITEM_PIPELINES": {"historic_md.pipelines.zip_pipeline.ZipPipeline": 1},
-    }
 
     def __init__(
             self,
@@ -37,7 +33,7 @@ class BinanceSpotTradeParser(BinanceParser):
     def get_currency_url(self, currency_pair: CurrencyPair, marker: Optional[str] = None) -> str:
         params: Dict[str, str] = {
             "delimiter": "/",
-            "prefix": f"data/spot/{self.collect_mode.lower()}/trades/{currency_pair.binance_name}/",
+            "prefix": f"data/futures/um/{self.collect_mode.lower()}/bookTicker/{currency_pair.binance_name}/",
         }
 
         if marker is not None:
@@ -48,7 +44,7 @@ class BinanceSpotTradeParser(BinanceParser):
 
 
 def main():
-    data_dir: Path = Path("D:/data/zipped_data/trades")
+    data_dir: Path = Path("D:/data/zipped_data/USDM-L1")
     bounds: Bounds = Bounds.for_days(
         start_inclusive=date(2024, 1, 1),
         end_exclusive=date(2024, 2, 1)
@@ -60,7 +56,7 @@ def main():
     ]
 
     process.crawl(
-        BinanceSpotTradeParser,
+        BinanceUSDML1Parser,
         bounds=bounds,
         currency_pairs=currency_pairs,
         collect_mode=CollectMode.MONTHLY,

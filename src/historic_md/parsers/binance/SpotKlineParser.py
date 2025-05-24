@@ -5,7 +5,7 @@ from urllib.parse import urlencode
 from core.currency_pair import CurrencyPair
 from core.parser_enums import CollectMode, KlineInterval
 from core.time_utils import Bounds
-from data_collection.parsers.binance.BinanceParser import BinanceParser, BINANCE_S3
+from historic_md.parsers.binance.BinanceParser import BINANCE_S3, BinanceParser
 
 
 class KlineParser(BinanceParser):

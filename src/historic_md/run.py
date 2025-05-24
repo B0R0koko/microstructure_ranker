@@ -6,17 +6,16 @@ from scrapy.crawler import CrawlerProcess
 
 from core.currency import get_target_currencies, Currency
 from core.currency_pair import CurrencyPair
-from core.parser_enums import CollectMode
 from core.time_utils import Bounds
-from data_collection.parsers.binance.FuturesTradeParser import BinanceFuturesTradeParser
-from data_collection.settings import SETTINGS
+from historic_md.parsers.okx.OKXParser import OKXTradeParser
+from historic_md.settings import SETTINGS
 
 
 def main():
-    data_dir: Path = Path("D:/data/zipped_data/USDM")
+    data_dir: Path = Path("D:/data/zipped_data/OKX_SPOT")
     bounds: Bounds = Bounds.for_days(
         start_inclusive=date(2024, 1, 1),
-        end_exclusive=date(2025, 5, 14)
+        end_exclusive=date(2024, 2, 1)
     )
     process: CrawlerProcess = CrawlerProcess(settings=SETTINGS)
     # Only collect data for USDT paired currency_pairs
@@ -25,10 +24,8 @@ def main():
     ]
 
     process.crawl(
-        BinanceFuturesTradeParser,
+        OKXTradeParser,
         bounds=bounds,
-        currency_pairs=usdt_pairs,
-        collect_mode=CollectMode.MONTHLY,
         output_dir=data_dir
     )
     process.start()

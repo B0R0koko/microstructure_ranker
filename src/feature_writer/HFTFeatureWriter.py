@@ -1,3 +1,4 @@
+import gc
 import logging
 import os
 from datetime import timedelta, date
@@ -5,7 +6,7 @@ from functools import partial
 from multiprocessing import freeze_support, RLock, Pool
 from multiprocessing.pool import AsyncResult
 from pathlib import Path
-from typing import List
+from typing import List, Dict
 
 import numpy as np
 import pandas as pd
@@ -18,7 +19,10 @@ from core.currency_pair import CurrencyPair
 from core.data_type import SamplingType, Feature
 from core.exchange import Exchange
 from core.paths import FEATURE_DIR
-from core.time_utils import Bounds, format_date, get_seconds_slug
+from core.time_utils import Bounds, format_date
+from feature_writer.feature_exprs import compute_asset_hold_time, compute_flow_imbalance, compute_return, \
+    compute_slippage_imbalance, compute_powerlaw_alpha, compute_share_of_long_trades, compute_sigma, compute_return_adj, \
+    compute_close_price
 from models.prediction.features import statistic_name
 
 SAMPLING_WINDOWS: List[timedelta] = [
@@ -62,31 +66,15 @@ def write_feature(values: np.ndarray, day: date, sampling_type: SamplingType, su
     np.save(path, values)
 
 
-def write_features_to_hive(sampled_features: pl.DataFrame, currency_pair: CurrencyPair, window: timedelta) -> None:
-    sampled_features = sampled_features.with_columns(
-        date=pl.col(SAMPLED_TIME).dt.date().cast(pl.String),
-        currency_pair=pl.lit(currency_pair.name).cast(pl.String),
-        window=pl.lit(get_seconds_slug(td=window)).cast(pl.String)
-    )
-    sampled_features.to_pandas().to_parquet(
-        FEATURE_DIR,
-        engine="pyarrow",
-        compression="gzip",
-        partition_cols=["date", "window", "currency_pair"],
-        existing_data_behavior="overwrite_or_ignore"
-    )
-
-
 class HFTFeatureWriter:
     """Define HFT feature writer that will sample MS500 features using Polars group_by_dynamic"""
 
     def __init__(
             self, bounds: Bounds, exchange: Exchange, sampling_type: SamplingType = SamplingType.MS500
     ):
+        logging.info("FeatureWriter started for %s", exchange.name)
         self._hive = pl.scan_parquet(exchange.get_hive_location(), hive_partitioning=True)
         self.exchange: Exchange = exchange
-        logging.info("FeatureWriter started for %s", exchange.name)
-
         self.bounds: Bounds = bounds
         self.sampling_type: SamplingType = sampling_type
 
@@ -108,7 +96,7 @@ class HFTFeatureWriter:
         df_ticks = df_ticks.sort(by=TRADE_TIME, descending=False)
         df_ticks = df_ticks.with_columns(
             quote_abs=pl.col(PRICE) * pl.col(QUANTITY),
-            side=1 - 2 * pl.col("is_buyer_maker")  # -1 if SELL, 1 if BUY
+            side=1 - 2 * pl.col("is_buyer_maker"),
         )
         df_ticks = df_ticks.with_columns(
             quote_sign=pl.col("quote_abs") * pl.col("side"),
@@ -124,7 +112,10 @@ class HFTFeatureWriter:
             quote_slippage_abs=(pl.col("quote_abs") - pl.col("price_first") * pl.col("quantity_abs")).abs()
         )
         df_trades = df_trades.with_columns(
-            quote_slippage_sign=pl.col("quote_slippage_abs") * pl.col("quantity_sign").sign()
+            quote_slippage_sign=pl.col("quote_slippage_abs") * pl.col("quantity_sign").sign(),
+            # Add lags of price_last and trade_time
+            price_last_prev=pl.col("price_last").shift(1),
+            trade_time_prev=pl.col("trade_time").shift(1)
         )
         return df_trades
 
@@ -167,10 +158,24 @@ class HFTFeatureWriter:
         )
 
         for window in pbar:
+
+            features: Dict[Feature, pl.Expr] = {
+                Feature.ASSET_RETURN: compute_return(),
+                Feature.ASSET_HOLD_TIME: compute_asset_hold_time(),
+                Feature.SIGMA: compute_sigma(),
+                Feature.SHARE_OF_LONG_TRADES: compute_flow_imbalance(),
+                Feature.POWERLAW_ALPHA: compute_slippage_imbalance(),
+                Feature.SLIPPAGE_IMBALANCE: compute_powerlaw_alpha(),
+                Feature.FLOW_IMBALANCE: compute_share_of_long_trades()
+            }
+
             date_index: pd.DatetimeIndex = pd.date_range(
                 bounds.start_inclusive, bounds.end_exclusive, freq=timedelta(milliseconds=500), inclusive="left"
             )
             df_index: pl.DataFrame = pl.DataFrame({SAMPLED_TIME: date_index})
+
+            if window == timedelta(milliseconds=500):
+                features[Feature.CLOSE_PRICE] = compute_close_price()
 
             sampled_features: pl.DataFrame = (
                 df_trades
@@ -179,39 +184,37 @@ class HFTFeatureWriter:
                     label="right",
                 )
                 # Compute features sampled for this WINDOW at 500ms frequency
-                .agg(
-                    asset_return=(pl.col("price_last").last() / pl.col("price_first").first() - 1) * 1e4,
-                    asset_hold_time=(
-                            (pl.col("trade_time").last() - pl.col("trade_time").first()).dt.total_nanoseconds()
-                            / 1e9
-                    ),
-                    flow_imbalance=pl.col("quote_sign").sum() / pl.col("quote_abs").sum(),
-                    slippage_imbalance=pl.col("quote_slippage_sign").sum() / pl.col("quote_slippage_abs").sum(),
-                    powerlaw_alpha=1 + pl.len() / (pl.col("quote_abs") / pl.col("quote_abs").min()).log().sum(),
-                    share_of_long_trades=pl.col("is_long").sum() / pl.len(),
-                )
-                # Trim ends with empty features
-                .filter(
-                    pl.col(TRADE_TIME).is_between(bounds.start_inclusive, bounds.end_exclusive)
+                .agg(features.values())
+                .filter(pl.col(TRADE_TIME).is_between(bounds.start_inclusive, bounds.end_exclusive))
+                .with_columns(
+                    compute_return_adj(window=window)
                 )
             )
+
             # left join to desired time index to make sure that dimensions are correct
-            sampled_features: pl.DataFrame = (
+            sampled_features = (
                 df_index
                 .join(sampled_features, left_on=SAMPLED_TIME, right_on=TRADE_TIME, how="left")
+                .with_columns(
+                    # Post process some features
+                    # 1. fill missing values in asset_return with 0
+                    asset_return=pl.col("asset_return").fill_null(0),
+                    asset_return_adj=compute_return_adj(window=window)
+                )
             )
+
+            if Feature.CLOSE_PRICE in features:
+                sampled_features = sampled_features.with_columns(
+                    close_price=pl.col("close_price").forward_fill()
+                )
+
             # Save features to daily structure
+            features_to_save: List[Feature] = list(features.keys()) + [Feature.ASSET_RETURN_ADJ]
+
             self.write_features_daily(
                 sampled_features=sampled_features,
                 currency_pair=currency_pair,
-                features=[
-                    Feature.ASSET_RETURN,
-                    Feature.ASSET_HOLD_TIME,
-                    Feature.SHARE_OF_LONG_TRADES,
-                    Feature.POWERLAW_ALPHA,
-                    Feature.SLIPPAGE_IMBALANCE,
-                    Feature.FLOW_IMBALANCE
-                ],
+                features=features_to_save,
                 window_td=window
             )
 
@@ -231,7 +234,14 @@ class HFTFeatureWriter:
         read_bar.update(1)
 
         df_trades: pl.DataFrame = self.preprocess_data(df_ticks=df_ticks)
+
+        del df_ticks  # free RAM from df_trades
+        gc.collect()
+
         self.compute_features(df_trades=df_trades, bounds=bounds, currency_pair=currency_pair, position=position)
+
+        del df_trades
+        gc.collect()
 
     def run_in_multiprocessing_pool(self, currency_pairs: List[CurrencyPair], cpu_count: int = 10) -> None:
         """Run daily feature writer using all cpu cores, susceptible to RAM limit"""

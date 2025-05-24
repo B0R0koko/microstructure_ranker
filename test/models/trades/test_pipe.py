@@ -7,7 +7,7 @@ import polars as pl
 
 from core.columns import SYMBOL, TRADE_TIME, PRICE
 from core.currency_pair import CurrencyPair
-from core.paths import HIVE_TRADES, FEATURE_DIR
+from core.paths import FEATURE_DIR, SPOT_TRADES
 from core.time_utils import Bounds, TimeOffset
 from models.trades.features.features_27_11 import compute_features
 
@@ -17,7 +17,7 @@ from models.trades.features.features_27_11 import compute_features
 def compute_target(bounds: Bounds, currency_pair: CurrencyPair, time_offset: TimeOffset) -> float:
     offset_bounds: Bounds = bounds.create_offset_bounds(time_offset=time_offset)
 
-    df_currency_pair: pl.DataFrame = pl.scan_parquet(HIVE_TRADES, hive_partitioning=True).filter(
+    df_currency_pair: pl.DataFrame = pl.scan_parquet(SPOT_TRADES, hive_partitioning=True).filter(
         (pl.col("date").is_between(offset_bounds.day0, offset_bounds.day1)) &
         (pl.col(TRADE_TIME).is_between(offset_bounds.start_inclusive, offset_bounds.end_exclusive)) &
         (pl.col(SYMBOL) == currency_pair.name)
@@ -31,7 +31,7 @@ def compute_target(bounds: Bounds, currency_pair: CurrencyPair, time_offset: Tim
 
 
 def manually_compute_features(bounds: Bounds, currency_pair: CurrencyPair) -> Dict[str, float]:
-    df_currency_pair: pl.DataFrame = pl.scan_parquet(HIVE_TRADES, hive_partitioning=True).filter(
+    df_currency_pair: pl.DataFrame = pl.scan_parquet(SPOT_TRADES, hive_partitioning=True).filter(
         (pl.col("date").is_between(bounds.day0, bounds.day1)) &
         (pl.col(TRADE_TIME).is_between(bounds.start_inclusive, bounds.end_exclusive)) &
         (pl.col(SYMBOL) == currency_pair.name)

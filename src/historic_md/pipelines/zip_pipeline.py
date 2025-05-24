@@ -5,12 +5,11 @@ from typing import Optional, Dict, Any
 import scrapy
 
 from core.currency_pair import CurrencyPair
-from data_collection.parsers.binance.BinanceParser import BinanceParser
 
 
 class ZipPipeline:
 
-    def process_item(self, item: Dict[str, Any], spider: BinanceParser) -> None:
+    def process_item(self, item: Dict[str, Any], spider) -> None:
         response: Optional[scrapy.http.Response] = item.get("response")
         currency_pair: Optional[CurrencyPair] = item.get("currency_pair")
         href: Optional[str] = item.get("href")

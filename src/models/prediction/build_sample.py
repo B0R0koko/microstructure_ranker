@@ -17,7 +17,7 @@ from ml_base.enums import DatasetType
 from ml_base.sample import SampleParams, Sample, concat_samples, MLDataset
 from models.prediction.columns import COL_CURRENCY_INDEX, COL_OUTPUT
 from models.prediction.features import read_slippage_imbalance, read_flow_imbalance, read_powerlaw_alpha, \
-    read_share_long_trades, shift, read_index, read_returns
+    read_share_long_trades, shift, read_index, read_returns, read_sampled_close_price, read_sigma
 
 
 class BuildDataset:
@@ -49,7 +49,7 @@ class BuildDataset:
         currency_pair: CurrencyPair = CurrencyPair(base=currency, term=Currency.USDT)
 
         for window in SAMPLING_WINDOWS:
-            for exchange in (Exchange.BINANCE_SPOT, Exchange.BINANCE_USDM):
+            for exchange in (Exchange.BINANCE_SPOT, Exchange.BINANCE_USDM, Exchange.OKX_SPOT):
                 # Read sampled features for each SAMPLING_WINDOW
                 features[f"{prefix}-asset_return-{get_seconds_slug(window)}@{exchange.name}"] = read_returns(
                     bounds=bounds, exchange=exchange, currency_pair=currency_pair, window=window
@@ -68,6 +68,9 @@ class BuildDataset:
                     f"{prefix}-share_of_long_trades-{get_seconds_slug(window)}@{exchange.name}"] = read_share_long_trades(
                     bounds=bounds, exchange=exchange, currency_pair=currency_pair, window=window
                 )
+                features[f"{prefix}-sigma-{get_seconds_slug(window)}@{exchange.name}"] = read_sigma(
+                    bounds=bounds, exchange=exchange, currency_pair=currency_pair, window=window
+                )
 
         return features
 
@@ -75,11 +78,13 @@ class BuildDataset:
         """Reads output return in pips with forecast step"""
         logging.info("Reading output for %s", currency.name)
         currency_pair: CurrencyPair = CurrencyPair(base=currency, term=Currency.USDT)
-        returns: np.ndarray = read_returns(
-            bounds=bounds, exchange=self.exchange, currency_pair=currency_pair, window=self.forecast_step
+        close: np.ndarray = read_sampled_close_price(
+            bounds=bounds, exchange=self.exchange, currency_pair=currency_pair, window=timedelta(milliseconds=500)
         )
-        shifted_returns: np.ndarray = shift(returns, n=-int(self.forecast_step / SamplingType.MS500.value))
-        return shifted_returns
+        shifted_close = shift(close, n=-int(self.forecast_step / SamplingType.MS500.value))
+        returns: np.ndarray = (shifted_close / close - 1) * 1e4
+
+        return returns
 
     def read_categorical_features(self, currency: Currency, col_size: int) -> Dict[str, np.ndarray]:
         """Read categorical features for the currency"""
@@ -127,7 +132,7 @@ class BuildDataset:
         )
         output: np.ndarray = self.read_output(bounds=bounds, currency=currency)
         # Merge all dictionaries together and create DataFrame from it
-        regressors: Dict[str, np.ndarray] = features_currency_specific | features_categorical
+        regressors: Dict[str, np.ndarray] = features_currency_specific | features_common | features_categorical
         features: Dict[str, np.ndarray] = regressors | {COL_OUTPUT: output}
         # Create FeatureSet
         feature_set: FeatureSet = FeatureSet(
@@ -136,7 +141,8 @@ class BuildDataset:
             target=COL_OUTPUT
         )
         df: pd.DataFrame = pd.DataFrame(features)
-        df = df.dropna(subset=[COL_OUTPUT], axis=0)  # remove observations with missing targets
+        df = df.dropna(axis=0, subset=[COL_OUTPUT])  # remove observations with missing targets
+
         return df, feature_set
 
     def create_sample(self, bounds: Bounds, sample_params: SampleParams) -> Sample:

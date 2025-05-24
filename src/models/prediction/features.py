@@ -34,7 +34,9 @@ def statistic_name(feature: Feature, exchange: Exchange, currency_pair: Currency
     return f"{feature.value}-{currency_pair.name}-{get_seconds_slug(window)}@{exchange.name}"
 
 
-def read_returns(bounds: Bounds, exchange: Exchange, currency_pair: CurrencyPair, window: timedelta) -> np.ndarray:
+def read_returns(
+        bounds: Bounds, exchange: Exchange, currency_pair: CurrencyPair, window: timedelta
+) -> np.ndarray:
     """Reads features like this D:/data/features/HFT/20240102/MS500/asset_return/asset_return-ADA-USDT-0.5S"""
     stat_name: str = statistic_name(
         feature=Feature.ASSET_RETURN, exchange=exchange, currency_pair=currency_pair, window=window
@@ -44,6 +46,36 @@ def read_returns(bounds: Bounds, exchange: Exchange, currency_pair: CurrencyPair
         get_day_ts=lambda day: read_scalar(
             day=day,
             subpath=Path(Feature.ASSET_RETURN.value) / exchange.name / stat_name,
+        )
+    )
+
+
+def read_sampled_open_price(
+        bounds: Bounds, exchange: Exchange, currency_pair: CurrencyPair, window: timedelta
+) -> np.ndarray:
+    stat_name: str = statistic_name(
+        feature=Feature.OPEN_PRICE, exchange=exchange, currency_pair=currency_pair, window=window
+    )
+    return multi_day_ts(
+        bounds=bounds,
+        get_day_ts=lambda day: read_scalar(
+            day=day,
+            subpath=Path(Feature.OPEN_PRICE.value) / exchange.name / stat_name,
+        )
+    )
+
+
+def read_sampled_close_price(
+        bounds: Bounds, exchange: Exchange, currency_pair: CurrencyPair, window: timedelta
+) -> np.ndarray:
+    stat_name: str = statistic_name(
+        feature=Feature.CLOSE_PRICE, exchange=exchange, currency_pair=currency_pair, window=window
+    )
+    return multi_day_ts(
+        bounds=bounds,
+        get_day_ts=lambda day: read_scalar(
+            day=day,
+            subpath=Path(Feature.CLOSE_PRICE.value) / exchange.name / stat_name,
         )
     )
 
@@ -144,6 +176,22 @@ def read_share_long_trades(
         get_day_ts=lambda day: read_scalar(
             day=day,
             subpath=Path(Feature.SHARE_OF_LONG_TRADES.value) / exchange.name / stat_name,
+        )
+    )
+
+
+def read_sigma(
+        bounds: Bounds, exchange: Exchange, currency_pair: CurrencyPair, window: timedelta
+) -> np.ndarray:
+    """Reads features like this D:/data/features/HFT/20240102/MS500/sigma/sigma-ADA-USDT-0.5S"""
+    stat_name: str = statistic_name(
+        feature=Feature.SIGMA, exchange=exchange, currency_pair=currency_pair, window=window
+    )
+    return multi_day_ts(
+        bounds=bounds,
+        get_day_ts=lambda day: read_scalar(
+            day=day,
+            subpath=Path(Feature.SIGMA.value) / exchange.name / stat_name,
         )
     )
 

@@ -18,8 +18,4 @@ SETTINGS = dict(
     DOWNLOAD_WARNSIZE=0.5 * GB,
     DOWNLOAD_MAXSIZE=15 * GB,
     DOWNLOAD_TIMEOUT=60 * 60 * 24,
-
-    ITEM_PIPELINES={
-        "historic_md.binance.pipelines.zip_pipeline.ZipPipeline": 1,
-    },
 )
