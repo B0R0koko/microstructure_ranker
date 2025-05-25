@@ -1,3 +1,4 @@
+import logging
 from datetime import date
 from pathlib import Path
 from typing import List, Optional
@@ -35,6 +36,7 @@ class FeatureFilter:
 
     @classmethod
     def from_importance(cls, file: Path, use_first: int = 25) -> "FeatureFilter":
+        logging.info("Loading feature importance file %s", file)
         df_importance: pd.DataFrame = pd.read_csv(file).sort_values(by="importance", ascending=False)
         return cls(
             allowed_features=df_importance["feature"].head(use_first).tolist(),

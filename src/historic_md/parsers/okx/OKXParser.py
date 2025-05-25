@@ -47,8 +47,8 @@ class OKXTradeParser(scrapy.Spider):
 
 def run_main():
     bounds: Bounds = Bounds.for_days(
-        date(2025, 5, 1),
-        date(2025, 5, 25)
+        date(2025, 4, 7),
+        date(2025, 4, 8)
     )
     process: CrawlerProcess = CrawlerProcess(settings=SETTINGS)
 

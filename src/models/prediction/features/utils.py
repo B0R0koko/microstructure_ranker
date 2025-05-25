@@ -1,3 +1,4 @@
+import logging
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Callable, List
@@ -14,13 +15,27 @@ from core.time_utils import format_date, Bounds, get_seconds_slug
 def read_scalar(
         day: date, subpath: Path, sampling_type: SamplingType = SamplingType.MS500
 ) -> np.ndarray:
-    """Read np.ndarray from file"""
+    """
+    If the file exists and its size is valid for the specified SamplingType, then read the data from file and return it
+    otherwise return empty np.ndarray with nan values
+    """
     path: Path = FEATURE_DIR / "HFT" / format_date(day=day) / sampling_type.name / subpath
-    values: np.ndarray = np.load(str(path) + ".npy")
+    path = path.with_suffix(suffix=".npy")
+    expected_shape = (sampling_type.get_valid_size(),)
 
-    assert len(values) == sampling_type.get_valid_size(), \
-        f"Array size {len(values)} didn't match expected {sampling_type.get_valid_size()}"
-    return values
+    data: np.ndarray = np.full(shape=expected_shape, fill_value=np.nan, dtype=np.float64)
+
+    if not path.exists():
+        logging.info("Path %s does not exist", path)
+        return data
+
+    values: np.ndarray = np.load(path)
+    if values.shape == expected_shape:
+        return values
+
+    logging.info("Wrong shape of %s. Ignoring the whole day.", path)
+
+    return data
 
 
 def multi_day_ts(bounds: Bounds, get_day_ts: Callable[[date], np.ndarray]) -> np.ndarray:

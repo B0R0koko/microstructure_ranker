@@ -227,13 +227,13 @@ def run_main():
     # Run SampledFeatureWriter from here
     # set PYTHONPATH to src folder and run from terminal such that Process progress bar is displayed correctly
     bounds: Bounds = Bounds.for_days(
-        date(2025, 5, 1), date(2025, 5, 25)
+        date(2025, 4, 1), date(2025, 5, 1)
     )
     writer = SampledFeatureWriter(bounds=bounds, exchange=Exchange.BINANCE_USDM)
     currency_pairs: List[CurrencyPair] = [
         CurrencyPair(base=currency.name, term=Currency.USDT.name) for currency in get_target_currencies()
     ]
-    writer.run_in_multiprocessing_pool(currency_pairs=currency_pairs)
+    writer.run_in_multiprocessing_pool(currency_pairs=currency_pairs, cpu_count=3)
 
 
 if __name__ == "__main__":

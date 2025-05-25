@@ -5,20 +5,19 @@ from datetime import timedelta, date
 from typing import List, Dict, Any
 
 import lightgbm as lgb
-import numpy as np
+import pandas as pd
 from lightgbm import Booster
 from scrapy.utils.log import configure_logging
-from sklearn.metrics import r2_score
 from tqdm import tqdm
 
-from core.currency import Currency
+from core.currency import Currency, get_target_currencies
 from core.exchange import Exchange
 from core.time_utils import Bounds
 from ml_base.enums import DatasetType
-from ml_base.features import FeatureFilter, save_feature_importances_to_file
+from ml_base.features import FeatureFilter, save_feature_importances_to_file, get_importance_file_path
+from ml_base.metrics import compute_metrics
 from ml_base.sample import MLDataset
 from models.prediction.build_sample import BuildDataset
-from models.prediction.columns import COL_CURRENCY_INDEX
 
 _BASE_PARAMS: Dict[str, Any] = {
     "objective": "mse",
@@ -90,44 +89,26 @@ class PrimaryPricePrediction:
 
         return booster
 
-    def evaluate_model(self, booster: Booster, bounds: Bounds, dataset: MLDataset) -> None:
-        """Log different statistics for each currency"""
-        y_pred: np.ndarray = booster.predict(dataset.data)  # type:ignore
-        logging.info("\n\nPrice prediction model performance for %s\n\n", str(bounds))
-
-        for currency in self.target_currencies:
-            mask = dataset.data[COL_CURRENCY_INDEX] == currency.value
-
-            if sum(mask) == 0:
-                logging.info("Skipping currency %s, there is no data", currency.name)
-                continue
-
-            logging.info(
-                "R2 for %s: %s", currency.name, r2_score(y_pred=y_pred[mask], y_true=dataset.label[mask])
-            )
-
     def build_model_pipeline(self) -> Booster:
-        logging.info("Starting build_model_pipeline")
+        """Once we ran feature_selection pipeline and narrowed down on the set of features, run this pipeline"""
+        logging.info("Running <build_model_pipeline>")
         builder: BuildDataset = self.get_dataset_builder()
+        train_dataset: MLDataset = builder.create_dataset(bounds=self.train_bounds, ds_type=DatasetType.TRAIN)
+        booster: Booster = self.train_model(dataset=train_dataset)
 
-        booster: Booster = self.fit_model_partially(chunk_interval=timedelta(days=3))
-
-        sub_test_bounds: List[Bounds] = self.test_bounds.generate_overlapping_bounds(
-            step=timedelta(days=3), interval=timedelta(days=3)
+        del train_dataset
+        gc.collect()
+        # After training the model evaluate the model and log statistics to stdout
+        test_dataset: MLDataset = builder.create_dataset(bounds=self.test_bounds, ds_type=DatasetType.TEST)
+        df_metrics: pd.DataFrame = compute_metrics(
+            booster=booster, dataset=test_dataset, target_currencies=self.target_currencies
         )
-
-        for i, sub_bound in enumerate(sub_test_bounds):
-            dataset: MLDataset = builder.create_dataset(bounds=sub_bound, ds_type=DatasetType.TEST)
-            self.evaluate_model(booster=booster, bounds=sub_bound, dataset=dataset)
-
-            del dataset
-            gc.collect()
-
+        logging.info("TEST metrics\n%s", df_metrics)
         return booster
 
-    def feature_selection_pipeline(self) -> None:
+    def feature_selection_pipeline(self, chunk_interval: timedelta) -> None:
         """Trains the model and writes feature_importances to local filesystem"""
-        booster: Booster = self.fit_model_partially(chunk_interval=timedelta(days=3))
+        booster: Booster = self.fit_model_partially(chunk_interval=chunk_interval)
         save_feature_importances_to_file(
             booster=booster, day=self.train_bounds.day1, target_exchange=self.target_exchange
         )
@@ -135,21 +116,23 @@ class PrimaryPricePrediction:
 
 def main():
     configure_logging()
-    train_bounds: Bounds = Bounds.for_days(date(2025, 5, 1), date(2025, 5, 20))
-    test_bounds: Bounds = Bounds.for_days(date(2025, 5, 20), date(2025, 5, 24))
+    train_bounds: Bounds = Bounds.for_days(date(2025, 4, 1), date(2025, 5, 5))
+    test_bounds: Bounds = Bounds.for_days(date(2025, 5, 5), date(2025, 5, 24))
 
-    feature_filter: FeatureFilter = FeatureFilter()
+    feature_filter: FeatureFilter = FeatureFilter.from_importance(
+        get_importance_file_path(day=date(2025, 5, 19), target_exchange=Exchange.BINANCE_SPOT)
+    )
 
     pipe = PrimaryPricePrediction(
         target_exchange=Exchange.BINANCE_SPOT,
-        target_currencies=[Currency.BTC, Currency.ETH, Currency.TRX, Currency.ADA, Currency.SOL],
+        target_currencies=get_target_currencies(),
         feature_filter=feature_filter,
         forecast_steps=timedelta(seconds=5),
         train_bounds=train_bounds,
         test_bounds=test_bounds,
     )
 
-    pipe.feature_selection_pipeline()
+    pipe.build_model_pipeline()
 
 
 if __name__ == "__main__":

@@ -76,7 +76,7 @@ class OKXSpotTrades2Hive:
 
 def run_main():
     bounds: Bounds = Bounds.for_days(
-        date(2025, 5, 1), date(2025, 5, 25)
+        date(2025, 4, 1), date(2025, 5, 1)
     )
     pipe = OKXSpotTrades2Hive(
         bounds=bounds,
