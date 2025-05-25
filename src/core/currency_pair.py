@@ -13,25 +13,25 @@ from core.time_utils import Bounds
 
 @dataclass
 class CurrencyPair:
-    base: Currency
-    term: Currency
+    base: str
+    term: str
 
     @classmethod
     def from_string(cls, symbol: str):
         """Parse CurrencyPair from string formatted like this: ADA-USDT"""
         base, term = symbol.split("-")
-        return cls(base=Currency[base], term=Currency[term])  # type:ignore
+        return cls(base=base, term=term)  # type:ignore
 
     def __str__(self) -> str:
-        return f"{self.base.name}-{self.term.name}"
+        return f"{self.base}-{self.term}"
 
     @property
     def name(self) -> str:
-        return f"{self.base.name}-{self.term.name}"
+        return f"{self.base}-{self.term}"
 
     @property
     def binance_name(self) -> str:
-        return f"{self.base.name}{self.term.name}"
+        return f"{self.base}{self.term}"
 
     def __hash__(self):
         return hash(self.base) * len(Currency) + hash(self.term)

@@ -2,7 +2,7 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict
 
-from core.paths import SPOT_TRADES, USDM_TRADES, OKX_SPOT_TRADES
+from core.paths import BINANCE_SPOT_HIVE_TRADES, BINANCE_USDM_HIVE_TRADES, OKX_SPOT_HIVE_TRADES
 
 
 class Exchange(Enum):
@@ -12,8 +12,8 @@ class Exchange(Enum):
 
     def get_hive_location(self) -> Path:
         hives: Dict[Exchange, Path] = {
-            Exchange.BINANCE_SPOT: SPOT_TRADES,
-            Exchange.BINANCE_USDM: USDM_TRADES,
-            Exchange.OKX_SPOT: OKX_SPOT_TRADES,
+            Exchange.BINANCE_SPOT: BINANCE_SPOT_HIVE_TRADES,
+            Exchange.BINANCE_USDM: BINANCE_USDM_HIVE_TRADES,
+            Exchange.OKX_SPOT: OKX_SPOT_HIVE_TRADES,
         }
         return hives[self]

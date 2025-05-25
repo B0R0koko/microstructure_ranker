@@ -12,7 +12,7 @@ from scrapy.utils.log import configure_logging
 from sklearn.metrics import r2_score
 from tqdm import tqdm
 
-from core.currency import Currency, get_target_currencies
+from core.currency import Currency
 from core.exchange import Exchange
 from core.time_utils import Bounds
 from ml_base.enums import DatasetType
@@ -65,7 +65,7 @@ class PrimaryPricePrediction:
         builder: BuildDataset = self.get_dataset_builder()
         # Use self.train_bounds for training the model
         sub_bounds: List[Bounds] = self.train_bounds.generate_overlapping_bounds(
-            step=timedelta(days=5), interval=timedelta(days=5)
+            step=timedelta(days=3), interval=timedelta(days=3)
         )
         dataset: MLDataset = builder.create_dataset(bounds=sub_bounds[0], ds_type=DatasetType.TRAIN)
         booster: Booster = self.train_model(dataset=dataset)
@@ -110,7 +110,7 @@ class PrimaryPricePrediction:
 
         booster: Booster = self.fit_model_partially()
         sub_test_bounds: List[Bounds] = self.test_bounds.generate_overlapping_bounds(
-            step=timedelta(days=5), interval=timedelta(days=5)
+            step=timedelta(days=3), interval=timedelta(days=3)
         )
 
         for i, sub_bound in enumerate(sub_test_bounds):
@@ -123,14 +123,14 @@ class PrimaryPricePrediction:
 
 def main():
     configure_logging()
-    train_bounds: Bounds = Bounds.for_days(date(2024, 1, 1), date(2024, 1, 20))
-    test_bounds: Bounds = Bounds.for_days(date(2024, 1, 20), date(2024, 2, 1))
+    train_bounds: Bounds = Bounds.for_days(date(2025, 5, 1), date(2025, 5, 20))
+    test_bounds: Bounds = Bounds.for_days(date(2025, 5, 20), date(2025, 5, 24))
 
     pipe = PrimaryPricePrediction(
         train_bounds=train_bounds,
         test_bounds=test_bounds,
         exchange=Exchange.BINANCE_SPOT,
-        target_currencies=get_target_currencies(),
+        target_currencies=[Currency.BTC, Currency.ETH, Currency.TRX, Currency.ADA, Currency.SOL],
         forecast_steps=timedelta(seconds=5)
     )
 

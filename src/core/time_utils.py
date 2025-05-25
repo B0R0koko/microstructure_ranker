@@ -102,7 +102,8 @@ class Bounds:
         return self.end_exclusive.date()
 
     def __str__(self) -> str:
-        return f"Bounds: {self.start_inclusive} - {self.end_exclusive}"
+        return (f"Bounds: {self.start_inclusive.strftime("%Y-%m-%d %H:%M:%S")} - "
+                f"{self.end_exclusive.strftime("%Y-%m-%d %H:%M:%S")}")
 
     def generate_overlapping_bounds(self, step: timedelta, interval: timedelta) -> List["Bounds"]:
         """Returns a list of bounds created from parent Bounds interval with a certain interval size and step"""
@@ -145,6 +146,27 @@ class Bounds:
         for dt in pd.date_range(self.day0, self.day1, freq="1D", inclusive="both"):
             yield dt.date()
 
+    def generate_year_month_strings(self) -> List[str]:
+        """
+        For Bounds.for_days(date(2025, 1, 1), date(2025, 3, 1)) returns -> ["202501", "202502"]
+        For Bounds.for_days(date(2025, 1, 1), date(2025, 3, 2)) returns -> ["202501", "202502", "202503"]
+        """
+        y, m = self.day0.year, self.day0.month
+        last_year, last_month = self.day1.year, self.day1.month
+
+        months: List[str] = []
+        # step month by month
+        while (y < last_year) or (y == last_year and m <= last_month):
+            months.append(f"{y:04d}{m:02d}")
+            # increment month
+            if m == 12:
+                y += 1
+                m = 1
+            else:
+                m += 1
+
+        return months
+
     def __eq__(self, other) -> bool:
         return self.start_inclusive == other.start_inclusive and self.end_exclusive == other.end_exclusive
 
@@ -172,8 +194,8 @@ class TimeOffset(Enum):
 
 if __name__ == "__main__":
     bounds: Bounds = Bounds.for_days(
-        start_inclusive=date(2025, 1, 1),
-        end_exclusive=date(2025, 2, 1),
+        start_inclusive=date(2024, 9, 10),
+        end_exclusive=date(2025, 2, 3),
     )
 
-    print(list(bounds.date_range()))
+    print(bounds.generate_year_month_strings())

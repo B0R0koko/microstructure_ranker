@@ -6,8 +6,9 @@ import scrapy
 from scrapy.crawler import CrawlerProcess
 from scrapy.http import Request, Response
 
+from core.paths import OKX_SPOT_RAW_TRADES
 from core.time_utils import Bounds
-from historic_md.settings import SETTINGS
+from historic_md.parsers.settings import SETTINGS
 
 
 class OKXTradeParser(scrapy.Spider):
@@ -17,10 +18,10 @@ class OKXTradeParser(scrapy.Spider):
     """
     name = "okx_spot_trade_parser"
 
-    def __init__(self, bounds: Bounds, output_dir: Path, *args, **kwargs):
+    def __init__(self, bounds: Bounds, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.bounds: Bounds = bounds
-        self.output_dir: Path = output_dir
+        self.output_dir: Path = OKX_SPOT_RAW_TRADES
 
     def get_zip_file_url(self, day: date) -> str:
         return f"https://www.okx.com/cdn/okex/traderecords/trades/monthly/{day.strftime("%Y%m")}/" \
@@ -45,17 +46,15 @@ class OKXTradeParser(scrapy.Spider):
 
 
 def run_main():
-    data_dir: Path = Path("D:/data/zipped_data/OKX_SPOT")
     bounds: Bounds = Bounds.for_days(
-        date(2024, 1, 1),
-        date(2024, 2, 1)
+        date(2025, 5, 1),
+        date(2025, 5, 25)
     )
     process: CrawlerProcess = CrawlerProcess(settings=SETTINGS)
 
     process.crawl(
         OKXTradeParser,
         bounds=bounds,
-        output_dir=data_dir
     )
     process.start()
 

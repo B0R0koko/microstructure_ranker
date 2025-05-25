@@ -10,7 +10,7 @@ SETTINGS = dict(
     ROBOTSTXT_OBEY=False,
     COOKIES_ENABLED=False,
     # Configure maximum concurrent requests performed by Scrapy (default: 16)
-    CONCURRENT_REQUESTS=3,
+    CONCURRENT_REQUESTS=16,
     CONCURRENT_REQUESTS_PER_DOMAIN=16,
     REACTOR_THREADPOOL_MAXSIZE=16,
     DOWNLOAD_DELAY=0.2,

@@ -12,7 +12,7 @@ from core.exchange import Exchange
 from core.feature_set import FeatureSet
 from core.time_utils import Bounds, get_seconds_slug
 from core.utils import configure_logging
-from feature_writer.HFTFeatureWriter import SAMPLING_WINDOWS
+from feature_writer.HFT.binance import SAMPLING_WINDOWS
 from ml_base.enums import DatasetType
 from ml_base.sample import SampleParams, Sample, concat_samples, MLDataset
 from models.prediction.columns import COL_CURRENCY_INDEX, COL_OUTPUT
@@ -42,11 +42,12 @@ class BuildDataset:
         )
         return btc_features | eth_features
 
-    def read_currency_specific_features(self, bounds: Bounds, currency: Currency, prefix: str = "SELF") -> Dict[
-        str, np.ndarray]:
+    def read_currency_specific_features(
+            self, bounds: Bounds, currency: Currency, prefix: str = "SELF"
+    ) -> Dict[str, np.ndarray]:
         logging.info("Reading currency specific features for %s", currency.name)
         features: Dict[str, np.ndarray] = {}
-        currency_pair: CurrencyPair = CurrencyPair(base=currency, term=Currency.USDT)
+        currency_pair: CurrencyPair = CurrencyPair(base=currency.name, term=Currency.USDT.name)
 
         for window in SAMPLING_WINDOWS:
             for exchange in (Exchange.BINANCE_SPOT, Exchange.BINANCE_USDM, Exchange.OKX_SPOT):
@@ -77,7 +78,7 @@ class BuildDataset:
     def read_output(self, bounds: Bounds, currency: Currency) -> np.ndarray:
         """Reads output return in pips with forecast step"""
         logging.info("Reading output for %s", currency.name)
-        currency_pair: CurrencyPair = CurrencyPair(base=currency, term=Currency.USDT)
+        currency_pair: CurrencyPair = CurrencyPair(base=currency.name, term=Currency.USDT.name)
         close: np.ndarray = read_sampled_close_price(
             bounds=bounds, exchange=self.exchange, currency_pair=currency_pair, window=timedelta(milliseconds=500)
         )

@@ -1,16 +1,33 @@
-from pathlib import Path
+import logging
+from datetime import date
 
-from preprocessing.pipelines.binance_usdm_trades_to_hive import BinanceUSDM2Hive
+import polars as pl
+
+from core.columns import TRADE_TIME
+from core.exchange import Exchange
+from core.time_utils import Bounds
+from core.utils import configure_logging
 
 
-def main():
-    hive_uploader = BinanceUSDM2Hive(
-        zipped_data_dir=Path("D:/data/zipped_data/USDM"),
-        output_dir=Path("D:/data/transformed/USDM"),
+def run_main():
+    """Check if the data uploaded to HIVE is correct"""
+    configure_logging()
+    bounds: Bounds = Bounds.for_days(
+        date(2025, 5, 1), date(2025, 5, 5)
+    )
+    logging.info("Collecting data for %s", str(bounds))
+    df: pl.DataFrame = (
+        pl.scan_parquet(Exchange.OKX_SPOT.get_hive_location(), hive_partitioning=True)
+        .filter(
+            (pl.col("symbol") == "ADA-USDT") &
+            (pl.col("date").is_between(bounds.day0, bounds.day1)) &
+            (pl.col(TRADE_TIME).is_between(bounds.start_inclusive, bounds.end_exclusive))
+        )
+        .collect()
     )
 
-    hive_uploader.run_multiprocessing(processes=15)
+    print(df)
 
 
 if __name__ == "__main__":
-    main()
+    run_main()

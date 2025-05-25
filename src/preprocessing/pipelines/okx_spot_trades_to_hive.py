@@ -9,7 +9,7 @@ import pandas as pd
 from tqdm import tqdm
 
 from core.columns import TRADE_TIME
-from core.paths import OKX_SPOT_TRADES
+from core.paths import OKX_SPOT_HIVE_TRADES, OKX_SPOT_RAW_TRADES
 from core.time_utils import Bounds
 
 _RAW_COLS: List[str] = [
@@ -37,7 +37,7 @@ class OKXSpotTrades2Hive:
     @staticmethod
     def save_batched_data_to_hive(df_batch: pd.DataFrame) -> None:
         df_batch.to_parquet(
-            OKX_SPOT_TRADES,
+            OKX_SPOT_HIVE_TRADES,
             engine="pyarrow",
             compression="gzip",
             partition_cols=["date", "symbol"],
@@ -76,11 +76,11 @@ class OKXSpotTrades2Hive:
 
 def run_main():
     bounds: Bounds = Bounds.for_days(
-        date(2024, 1, 1), date(2024, 2, 1)
+        date(2025, 5, 1), date(2025, 5, 25)
     )
     pipe = OKXSpotTrades2Hive(
-        raw_data_path=Path(r"D:\data\zipped_data\OKX_SPOT"),
-        bounds=bounds
+        bounds=bounds,
+        raw_data_path=OKX_SPOT_RAW_TRADES,
     )
     pipe.run_multiprocessing()
 

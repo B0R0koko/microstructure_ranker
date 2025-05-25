@@ -1,10 +1,20 @@
 from pathlib import Path
 
 DATA_DIR: Path = Path(r"D:\data")
+RAW_DATA_DIR: Path = DATA_DIR / "raw"
+TRANSFORMED_DATA_DIR: Path = DATA_DIR / "transformed"
 
-SPOT_TRADES: Path = DATA_DIR.joinpath("transformed").joinpath("trades")
-USDM_TRADES: Path = DATA_DIR.joinpath("transformed").joinpath("USDM")
-USDM_L1: Path = DATA_DIR.joinpath("transformed").joinpath("USDM-L1")
-OKX_SPOT_TRADES: Path = DATA_DIR.joinpath("transformed").joinpath("OKX-SPOT")
+TEST_DATA_DIR: Path = DATA_DIR / "test"
+
+# Raw zip files
+BINANCE_SPOT_RAW_TRADES: Path = RAW_DATA_DIR / "binance" / "spot" / "trades"
+BINANCE_USDM_RAW_TRADES: Path = RAW_DATA_DIR / "binance" / "usdm" / "trades"
+BINANCE_USDM_RAW_L1: Path = RAW_DATA_DIR / "binance" / "usdm" / "l1"
+OKX_SPOT_RAW_TRADES: Path = RAW_DATA_DIR / "okx" / "spot" / "trades"
+
+# HIVE locations
+BINANCE_SPOT_HIVE_TRADES: Path = TRANSFORMED_DATA_DIR / "binance" / "spot" / "trades"
+BINANCE_USDM_HIVE_TRADES: Path = TRANSFORMED_DATA_DIR / "binance" / "usdm" / "trades"
+OKX_SPOT_HIVE_TRADES: Path = TRANSFORMED_DATA_DIR / "okx" / "spot" / "trades"
 
 FEATURE_DIR: Path = DATA_DIR.joinpath("features")

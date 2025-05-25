@@ -14,7 +14,7 @@ from tqdm import tqdm
 
 from core.columns import TRADE_TIME, SYMBOL, PRICE
 from core.currency_pair import CurrencyPair, get_cross_section_currencies
-from core.paths import FEATURE_DIR, SPOT_TRADES
+from core.paths import FEATURE_DIR, BINANCE_SPOT_TRADES
 from core.time_utils import Bounds, TimeOffset
 from models.trades.features.high_frequency_features import compute_features
 
@@ -241,7 +241,7 @@ def _test_main():
     cross_section_bounds: List[Bounds] = bounds.generate_overlapping_bounds(step=step, interval=interval)
 
     pipeline: TradesPipeline = TradesPipeline(
-        hive_dir=SPOT_TRADES,
+        hive_dir=BINANCE_SPOT_TRADES,
         output_features_path=output_features_path,
         num_processes=20,
         warmup_start=False,

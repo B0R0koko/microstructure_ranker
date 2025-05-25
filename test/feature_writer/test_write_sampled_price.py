@@ -8,7 +8,7 @@ from core.columns import TRADE_TIME, SYMBOL, SAMPLED_TIME, PRICE, OPEN_PRICE, CL
 from core.currency import Currency
 from core.currency_pair import CurrencyPair
 from core.exchange import Exchange
-from core.paths import SPOT_TRADES
+from core.paths import BINANCE_SPOT_TRADES
 from core.time_utils import Bounds
 from models.prediction.features import read_sampled_open_price, read_sampled_close_price
 
@@ -22,7 +22,7 @@ def test_write_sampled_price():
     currency_pair: CurrencyPair = CurrencyPair(base=Currency.ADA, term=Currency.USDT)
 
     df_ticks: pl.DataFrame = (
-        pl.scan_parquet(SPOT_TRADES, hive_partitioning=True)
+        pl.scan_parquet(BINANCE_SPOT_TRADES, hive_partitioning=True)
         .filter(
             (pl.col("date").is_between(expanded_bounds.day0, expanded_bounds.day1)) &
             (pl.col(SYMBOL) == currency_pair.name) &

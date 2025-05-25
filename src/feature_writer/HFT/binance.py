@@ -1,7 +1,5 @@
-import gc
 import logging
-import os
-from datetime import timedelta, date
+from datetime import date
 from functools import partial
 from multiprocessing import freeze_support, RLock, Pool
 from multiprocessing.pool import AsyncResult
@@ -10,19 +8,16 @@ from typing import List, Dict
 
 import numpy as np
 import pandas as pd
-import polars as pl
 from tqdm import tqdm
 
-from core.columns import SYMBOL, TRADE_TIME, PRICE, QUANTITY, SAMPLED_TIME
-from core.currency import Currency, get_target_currencies
+from core.columns import SYMBOL, TRADE_TIME, PRICE, IS_BUYER_MAKER, QUANTITY, SAMPLED_TIME
+from core.currency import get_target_currencies, Currency
 from core.currency_pair import CurrencyPair
-from core.data_type import SamplingType, Feature
+from core.data_type import Feature, SamplingType
 from core.exchange import Exchange
-from core.paths import FEATURE_DIR
-from core.time_utils import Bounds, format_date
-from feature_writer.feature_exprs import compute_asset_hold_time, compute_flow_imbalance, compute_return, \
-    compute_slippage_imbalance, compute_powerlaw_alpha, compute_share_of_long_trades, compute_sigma, compute_return_adj, \
-    compute_close_price
+from core.time_utils import Bounds
+from feature_writer.feature_exprs import *
+from feature_writer.utils import write_feature, aggregate_into_trades
 from models.prediction.features import statistic_name
 
 SAMPLING_WINDOWS: List[timedelta] = [
@@ -38,45 +33,15 @@ SAMPLING_WINDOWS: List[timedelta] = [
 ]
 
 
-def aggregate_into_trades(df_ticks: pl.DataFrame) -> pl.DataFrame:
-    """Aggregate ticks into trades by TRADE_TIME"""
-    df_trades: pl.DataFrame = (
-        df_ticks
-        .group_by(TRADE_TIME, maintain_order=True)
-        .agg(
-            price_first=pl.col(PRICE).first(),  # if someone placed a trade with price impact, then price_first
-            price_last=pl.col(PRICE).last(),  # and price_last will differ
-            # Amount spent in quote asset for the trade
-            quote_abs=pl.col("quote_abs").sum(),
-            quote_sign=pl.col("quote_sign").sum(),
-            quantity_sign=pl.col("quantity_sign").sum(),
-            # Amount of base asset transacted
-            quantity_abs=pl.col("quantity").sum(),
-            num_ticks=pl.col("price").count(),  # number of ticks for each trade
-        )
-    )
-    df_trades = df_trades.with_columns(is_long=pl.col("quantity_sign") >= 0)
-    return df_trades
+class SampledFeatureWriter:
 
-
-def write_feature(values: np.ndarray, day: date, sampling_type: SamplingType, subpath: Path) -> None:
-    """Writes sampled np.ndarray with feature to {FEATURE_DIR}/HFT/20250101/MS500/asset_return/ADA"""
-    path: Path = FEATURE_DIR / "HFT" / format_date(day=day) / sampling_type.name / subpath
-    os.makedirs(path.parent, exist_ok=True)
-    np.save(path, values)
-
-
-class HFTFeatureWriter:
-    """Define HFT feature writer that will sample MS500 features using Polars group_by_dynamic"""
-
-    def __init__(
-            self, bounds: Bounds, exchange: Exchange, sampling_type: SamplingType = SamplingType.MS500
-    ):
+    def __init__(self, bounds: Bounds, exchange: Exchange):
         logging.info("FeatureWriter started for %s", exchange.name)
         self._hive = pl.scan_parquet(exchange.get_hive_location(), hive_partitioning=True)
-        self.exchange: Exchange = exchange
+
         self.bounds: Bounds = bounds
-        self.sampling_type: SamplingType = sampling_type
+        self.exchange: Exchange = exchange
+        self.sampling_type: SamplingType = SamplingType.MS500
 
     def load_data_for_currency(self, bounds: Bounds, currency_pair: CurrencyPair):
         """Load data for currency from HiveDataset"""
@@ -91,19 +56,26 @@ class HFTFeatureWriter:
             .sort(by=TRADE_TIME)
         )
 
-    def preprocess_data(self, df_ticks: pl.DataFrame) -> pl.DataFrame:
-        """Aggregate ticks into trades and add additional columns here that will be used to compute features"""
-        df_ticks = df_ticks.sort(by=TRADE_TIME, descending=False)
-        df_ticks = df_ticks.with_columns(
+    @staticmethod
+    def side_expr() -> pl.Expr:
+        """
+        Overwrite the way we compute side sign. For Binance we do it with IS_BUYER_MAKER field
+        for OKX we use simply use Side Literal string
+        """
+        return 1 - 2 * pl.col(IS_BUYER_MAKER)
+
+    def preprocess_data_for_currency(self, df: pl.DataFrame) -> pl.DataFrame:
+        df = df.sort(by=TRADE_TIME, descending=False)
+        df = df.with_columns(
             quote_abs=pl.col(PRICE) * pl.col(QUANTITY),
-            side=1 - 2 * pl.col("is_buyer_maker"),
+            side=self.side_expr(),
         )
-        df_ticks = df_ticks.with_columns(
+        df = df.with_columns(
             quote_sign=pl.col("quote_abs") * pl.col("side"),
-            quantity_sign=pl.col("quantity") * pl.col("side")
+            quantity_sign=pl.col(QUANTITY) * pl.col("side")
         )
         # Aggregate into trades
-        df_trades: pl.DataFrame = aggregate_into_trades(df_ticks=df_ticks)
+        df_trades: pl.DataFrame = aggregate_into_trades(df_ticks=df)
 
         assert df_trades[TRADE_TIME].is_sorted(descending=False), "Data must be in ascending order by TRADE_TIME"
 
@@ -115,15 +87,12 @@ class HFTFeatureWriter:
             quote_slippage_sign=pl.col("quote_slippage_abs") * pl.col("quantity_sign").sign(),
             # Add lags of price_last and trade_time
             price_last_prev=pl.col("price_last").shift(1),
-            trade_time_prev=pl.col("trade_time").shift(1)
+            trade_time_prev=pl.col(TRADE_TIME).shift(1)
         )
         return df_trades
 
     def write_features_daily(
-            self,
-            sampled_features: pl.DataFrame,
-            currency_pair: CurrencyPair,
-            features: List[Feature],
+            self, sampled_features: pl.DataFrame, currency_pair: CurrencyPair, features: List[Feature],
             window_td: timedelta,
     ) -> None:
         """Write sampled features to local filesystem"""
@@ -133,7 +102,9 @@ class HFTFeatureWriter:
         ):
             # Write time index
             write_feature(
-                values=daily_features[SAMPLED_TIME].to_numpy(), day=day, sampling_type=self.sampling_type,
+                values=daily_features[SAMPLED_TIME].to_numpy(),
+                day=day,
+                sampling_type=self.sampling_type,
                 subpath=Path("time")
             )
 
@@ -149,13 +120,17 @@ class HFTFeatureWriter:
                     subpath=Path(feature.value) / self.exchange.name / name
                 )
 
-    def compute_features(self, df_trades: pl.DataFrame, bounds: Bounds, currency_pair: CurrencyPair, position: int):
-        """Define how features are computed here"""
+    def write_features_for_currency(self, chunk_bounds: Bounds, currency_pair: CurrencyPair, position: int):
         pbar = tqdm(
-            SAMPLING_WINDOWS, desc=f"Computing features for {currency_pair.name}@{str(bounds)}...",
+            SAMPLING_WINDOWS, desc="Reading file...",
             position=2 + position,
             leave=False
         )
+
+        df: pl.DataFrame = self.load_data_for_currency(bounds=chunk_bounds, currency_pair=currency_pair)
+        df = self.preprocess_data_for_currency(df=df)
+
+        pbar.set_description(f"Computing features for {currency_pair.name}@{str(chunk_bounds)}")
 
         for window in pbar:
 
@@ -170,7 +145,8 @@ class HFTFeatureWriter:
             }
 
             date_index: pd.DatetimeIndex = pd.date_range(
-                bounds.start_inclusive, bounds.end_exclusive, freq=timedelta(milliseconds=500), inclusive="left"
+                chunk_bounds.start_inclusive, chunk_bounds.end_exclusive,
+                freq=timedelta(milliseconds=500), inclusive="left"
             )
             df_index: pl.DataFrame = pl.DataFrame({SAMPLED_TIME: date_index})
 
@@ -178,14 +154,14 @@ class HFTFeatureWriter:
                 features[Feature.CLOSE_PRICE] = compute_close_price()
 
             sampled_features: pl.DataFrame = (
-                df_trades
+                df
                 .group_by_dynamic(
                     index_column=TRADE_TIME, every=self.sampling_type.value, period=window, closed="right",
                     label="right",
                 )
                 # Compute features sampled for this WINDOW at 500ms frequency
                 .agg(features.values())
-                .filter(pl.col(TRADE_TIME).is_between(bounds.start_inclusive, bounds.end_exclusive))
+                .filter(pl.col(TRADE_TIME).is_between(chunk_bounds.start_inclusive, chunk_bounds.end_exclusive))
                 .with_columns(
                     compute_return_adj(window=window)
                 )
@@ -218,31 +194,6 @@ class HFTFeatureWriter:
                 window_td=window
             )
 
-    def generate_features_for_currency_pair(self, currency_pair: CurrencyPair, bounds: Bounds, position: int) -> None:
-        # Expand bounds such that ends of interval are computed as well
-        expanded_bounds: Bounds = bounds.expand_bounds(
-            lb_timedelta=timedelta(minutes=5), rb_timedelta=timedelta(minutes=5)
-        )
-        read_bar = tqdm(
-            total=1,
-            desc=f"Reading data for {currency_pair.name}@{str(bounds)}...",
-            position=2 + position,
-            leave=False
-        )
-        # Collect data with expanded bounds such that the ends of features are computed
-        df_ticks: pl.DataFrame = self.load_data_for_currency(bounds=expanded_bounds, currency_pair=currency_pair)
-        read_bar.update(1)
-
-        df_trades: pl.DataFrame = self.preprocess_data(df_ticks=df_ticks)
-
-        del df_ticks  # free RAM from df_trades
-        gc.collect()
-
-        self.compute_features(df_trades=df_trades, bounds=bounds, currency_pair=currency_pair, position=position)
-
-        del df_trades
-        gc.collect()
-
     def run_in_multiprocessing_pool(self, currency_pairs: List[CurrencyPair], cpu_count: int = 10) -> None:
         """Run daily feature writer using all cpu cores, susceptible to RAM limit"""
         # We want to parallelize over (CurrencyPair, day) to avoid cases when all workers are finished
@@ -261,7 +212,7 @@ class HFTFeatureWriter:
                     promises.append(
                         pool.apply_async(
                             partial(
-                                self.generate_features_for_currency_pair, bounds=Bounds.for_day(day),
+                                self.write_features_for_currency, chunk_bounds=Bounds.for_day(day),
                                 currency_pair=currency_pair, position=i % cpu_count
                             )
                         )
@@ -272,13 +223,18 @@ class HFTFeatureWriter:
                 p.get()
 
 
-if __name__ == "__main__":
-    bounds = Bounds.for_days(date(2024, 1, 1), date(2024, 2, 1))
-    exchange: Exchange = Exchange.BINANCE_USDM
-
-    writer = HFTFeatureWriter(exchange=exchange, bounds=bounds)
-
-    writer.run_in_multiprocessing_pool(
-        currency_pairs=[CurrencyPair(base=currency, term=Currency.USDT) for currency in get_target_currencies()],
-        cpu_count=5
+def run_main():
+    # Run SampledFeatureWriter from here
+    # set PYTHONPATH to src folder and run from terminal such that Process progress bar is displayed correctly
+    bounds: Bounds = Bounds.for_days(
+        date(2025, 5, 1), date(2025, 5, 25)
     )
+    writer = SampledFeatureWriter(bounds=bounds, exchange=Exchange.BINANCE_USDM)
+    currency_pairs: List[CurrencyPair] = [
+        CurrencyPair(base=currency.name, term=Currency.USDT.name) for currency in get_target_currencies()
+    ]
+    writer.run_in_multiprocessing_pool(currency_pairs=currency_pairs)
+
+
+if __name__ == "__main__":
+    run_main()
