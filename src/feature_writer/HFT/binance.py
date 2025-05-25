@@ -18,7 +18,7 @@ from core.exchange import Exchange
 from core.time_utils import Bounds
 from feature_writer.feature_exprs import *
 from feature_writer.utils import write_feature, aggregate_into_trades
-from models.prediction.features import statistic_name
+from models.prediction.features.utils import statistic_name
 
 SAMPLING_WINDOWS: List[timedelta] = [
     timedelta(milliseconds=500),

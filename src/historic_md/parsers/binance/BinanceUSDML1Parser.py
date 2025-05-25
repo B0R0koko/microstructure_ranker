@@ -27,19 +27,20 @@ class BinanceUSDML1Parser(BinanceSpotTradesParser):
             output_dir=output_dir
         )
 
-    def get_prefix(self, currency_pair: CurrencyPair) -> str:
+    @staticmethod
+    def get_prefix(currency_pair: CurrencyPair) -> str:
         return f"data/futures/um/daily/bookTicker/{currency_pair.binance_name}/"
 
 
 def main():
     bounds: Bounds = Bounds.for_days(
-        start_inclusive=date(2024, 1, 1),
-        end_exclusive=date(2024, 2, 1)
+        start_inclusive=date(2025, 5, 1),
+        end_exclusive=date(2025, 5, 25)
     )
     process: CrawlerProcess = CrawlerProcess(settings=SETTINGS)
     # Only collect data for USDT paired currency_pairs
     currency_pairs: List[CurrencyPair] = [
-        CurrencyPair(base=currency, term=Currency.USDT) for currency in get_target_currencies()
+        CurrencyPair(base=currency.name, term=Currency.USDT.name) for currency in get_target_currencies()
     ]
 
     process.crawl(

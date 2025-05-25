@@ -13,6 +13,7 @@ class Feature(Enum):
     POWERLAW_ALPHA = "powerlaw_alpha"
     SHARE_OF_LONG_TRADES = "share_of_long_trades"
     CLOSE_PRICE = "close_price"
+    EXCHANGE_DIFF = "exchange_diff"
 
 
 class SamplingType(Enum):

@@ -6,7 +6,6 @@ import lightgbm as lgb
 import pandas as pd
 
 from core.feature_set import FeatureSet
-from core.time_utils import Bounds
 from ml_base.enums import DatasetType
 
 
@@ -153,11 +152,18 @@ def concat_samples(samples: List[Sample], require_lgb: bool = True) -> Sample:
 
 class SampleParams:
 
-    def __init__(self, train_share: float, validation_share: float = 0, test_share: float = 0):
+    def __init__(
+            self,
+            train_share: float,
+            allowed_features: Optional[List[str]] = None,
+            validation_share: float = 0,
+            test_share: float = 0
+    ):
         assert train_share + validation_share + test_share == 1, "All shares must add up to 1"
         self.train_share: float = train_share
         self.validation_share: float = validation_share
         self.test_share: float = test_share
+        self.allowed_features: Optional[List[str]] = allowed_features
 
     def split_by_indecies(self, df: pd.DataFrame) -> Dict[DatasetType, pd.DataFrame]:
         """Generate indecies to split dataframe into TRAIN/VALIDATION/TEST sets"""
@@ -174,5 +180,10 @@ class SampleParams:
             if not data.empty
         }
 
-    def return_bounds(self, bounds: Bounds) -> Bounds:
-        """Returns bounds for a given DatasetType from shares passed in to SampleParams"""
+    def is_allowed(self, feature_name: str) -> bool:
+        """Checks if the feature is allowed"""
+        if self.allowed_features is None:
+            return True
+        if feature_name not in self.allowed_features:
+            return False
+        return True

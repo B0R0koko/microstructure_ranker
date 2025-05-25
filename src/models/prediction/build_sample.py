@@ -8,27 +8,39 @@ import pandas as pd
 from core.currency import Currency, get_target_currencies
 from core.currency_pair import CurrencyPair
 from core.data_type import SamplingType
-from core.exchange import Exchange
+from core.exchange import Exchange, ExchangeSet
 from core.feature_set import FeatureSet
-from core.time_utils import Bounds, get_seconds_slug
+from core.time_utils import Bounds
 from core.utils import configure_logging
 from feature_writer.HFT.binance import SAMPLING_WINDOWS
 from ml_base.enums import DatasetType
+from ml_base.features import FeatureFilter
 from ml_base.sample import SampleParams, Sample, concat_samples, MLDataset
 from models.prediction.columns import COL_CURRENCY_INDEX, COL_OUTPUT
-from models.prediction.features import read_slippage_imbalance, read_flow_imbalance, read_powerlaw_alpha, \
-    read_share_long_trades, shift, read_index, read_returns, read_sampled_close_price, read_sigma
+from models.prediction.features.asset_return import add_returns
+from models.prediction.features.exchange_diff import add_exchange_diffs
+from models.prediction.features.flow_imbalance import add_flow_imbalances
+from models.prediction.features.index import read_index
+from models.prediction.features.powerlaw_alpha import add_powerlaw_alphas
+from models.prediction.features.sampled_close_price import read_sampled_close_price
+from models.prediction.features.share_of_long_trades import add_share_of_long_trades
+from models.prediction.features.slippage_imbalance import add_slippage_imbalances
+from models.prediction.features.utils import shift
 
 
 class BuildDataset:
 
     def __init__(
             self,
-            exchange: Exchange,
+            target_exchange: Exchange,
             target_currencies: List[Currency],
+            feature_filter: FeatureFilter,
             forecast_step: timedelta
     ):
-        self.exchange: Exchange = exchange
+        self.target_exchange: Exchange = target_exchange
+        # Get ExchangeSet infer from target_exchange
+        self.exchange_set: ExchangeSet = ExchangeSet.for_exchange(target_exchange=target_exchange)
+        self.feature_filter: FeatureFilter = feature_filter
         self.target_currencies: List[Currency] = target_currencies
         self.forecast_step: timedelta = forecast_step
 
@@ -46,41 +58,78 @@ class BuildDataset:
             self, bounds: Bounds, currency: Currency, prefix: str = "SELF"
     ) -> Dict[str, np.ndarray]:
         logging.info("Reading currency specific features for %s", currency.name)
-        features: Dict[str, np.ndarray] = {}
-        currency_pair: CurrencyPair = CurrencyPair(base=currency.name, term=Currency.USDT.name)
+        features_currency_specific: Dict[str, np.ndarray] = {}
 
         for window in SAMPLING_WINDOWS:
-            for exchange in (Exchange.BINANCE_SPOT, Exchange.BINANCE_USDM, Exchange.OKX_SPOT):
-                # Read sampled features for each SAMPLING_WINDOW
-                features[f"{prefix}-asset_return-{get_seconds_slug(window)}@{exchange.name}"] = read_returns(
-                    bounds=bounds, exchange=exchange, currency_pair=currency_pair, window=window
-                )
-                features[
-                    f"{prefix}-slippage_imbalance-{get_seconds_slug(window)}@{exchange.name}"] = read_slippage_imbalance(
-                    bounds=bounds, exchange=exchange, currency_pair=currency_pair, window=window
-                )
-                features[f"{prefix}-flow_imbalance_{get_seconds_slug(window)}@{exchange.name}"] = read_flow_imbalance(
-                    bounds=bounds, exchange=exchange, currency_pair=currency_pair, window=window
-                )
-                features[f"{prefix}-powerlaw_alpha-{get_seconds_slug(window)}@{exchange.name}"] = read_powerlaw_alpha(
-                    bounds=bounds, exchange=exchange, currency_pair=currency_pair, window=window
-                )
-                features[
-                    f"{prefix}-share_of_long_trades-{get_seconds_slug(window)}@{exchange.name}"] = read_share_long_trades(
-                    bounds=bounds, exchange=exchange, currency_pair=currency_pair, window=window
-                )
-                features[f"{prefix}-sigma-{get_seconds_slug(window)}@{exchange.name}"] = read_sigma(
-                    bounds=bounds, exchange=exchange, currency_pair=currency_pair, window=window
-                )
+            # This function adds values to feature_currency_specific if the feature is allowed
+            add_returns(
+                ts_by_name=features_currency_specific,
+                bounds=bounds,
+                currency=currency,
+                exchange_set=self.exchange_set,
+                feature_filter=self.feature_filter,
+                window=window,
+                prefix=prefix
+            )
 
-        return features
+            add_flow_imbalances(
+                ts_by_name=features_currency_specific,
+                bounds=bounds,
+                currency=currency,
+                exchange_set=self.exchange_set,
+                feature_filter=self.feature_filter,
+                window=window,
+                prefix=prefix
+            )
+
+            add_powerlaw_alphas(
+                ts_by_name=features_currency_specific,
+                bounds=bounds,
+                currency=currency,
+                exchange_set=self.exchange_set,
+                feature_filter=self.feature_filter,
+                window=window,
+                prefix=prefix
+            )
+
+            add_slippage_imbalances(
+                ts_by_name=features_currency_specific,
+                bounds=bounds,
+                currency=currency,
+                exchange_set=self.exchange_set,
+                feature_filter=self.feature_filter,
+                window=window,
+            )
+
+            add_exchange_diffs(
+                ts_by_name=features_currency_specific,
+                bounds=bounds,
+                currency=currency,
+                exchange_set=self.exchange_set,
+                feature_filter=self.feature_filter,
+                window=window,
+            )
+
+            add_share_of_long_trades(
+                ts_by_name=features_currency_specific,
+                bounds=bounds,
+                currency=currency,
+                exchange_set=self.exchange_set,
+                feature_filter=self.feature_filter,
+                window=window,
+            )
+
+        return features_currency_specific
 
     def read_output(self, bounds: Bounds, currency: Currency) -> np.ndarray:
         """Reads output return in pips with forecast step"""
         logging.info("Reading output for %s", currency.name)
         currency_pair: CurrencyPair = CurrencyPair(base=currency.name, term=Currency.USDT.name)
         close: np.ndarray = read_sampled_close_price(
-            bounds=bounds, exchange=self.exchange, currency_pair=currency_pair, window=timedelta(milliseconds=500)
+            bounds=bounds,
+            exchange=self.target_exchange,
+            currency_pair=currency_pair,
+            window=timedelta(milliseconds=500)  # reads MS500 sampled close_price
         )
         shifted_close = shift(close, n=-int(self.forecast_step / SamplingType.MS500.value))
         returns: np.ndarray = (shifted_close / close - 1) * 1e4
@@ -220,11 +269,12 @@ class BuildDataset:
 def run_test():
     configure_logging()
     bounds: Bounds = Bounds.for_days(
-        date(2024, 1, 1), date(2024, 1, 5)
+        date(2025, 5, 1), date(2025, 5, 5)
     )
     build = BuildDataset(
-        exchange=Exchange.BINANCE_SPOT,
+        target_exchange=Exchange.BINANCE_SPOT,
         target_currencies=get_target_currencies(),
+        feature_filter=FeatureFilter(),
         forecast_step=timedelta(seconds=5),
     )
     build.create_dataset(bounds=bounds, ds_type=DatasetType.TRAIN)

@@ -12,7 +12,7 @@ from scrapy.crawler import CrawlerProcess
 from scrapy.http import Response
 
 from core.currency_pair import CurrencyPair, collect_all_spot_currency_pairs
-from core.paths import TEST_DATA_DIR, BINANCE_SPOT_RAW_TRADES
+from core.paths import BINANCE_SPOT_RAW_TRADES
 from core.time_utils import Bounds
 from core.utils import configure_logging
 from historic_md.parsers.settings import SETTINGS
@@ -104,6 +104,8 @@ class BinanceSpotTradesParser(scrapy.Spider):
         # Filter hrefs by dates that we want to collect data for
         filtered_hrefs, href_dates = filter_hrefs_by_bounds(hrefs=href_container, bounds=self.bounds)
 
+        print(filtered_hrefs)
+
         for href, day in zip(filtered_hrefs, href_dates):
             yield scrapy.Request(
                 url=get_zip_file_url(href=href),
@@ -115,7 +117,6 @@ class BinanceSpotTradesParser(scrapy.Spider):
         day: date = response.meta.get("day")
         currency_pair: CurrencyPair = response.meta.get("currency_pair")
         path: Path = self.output_dir / currency_pair.name / f"trades@{str(day)}.zip"
-
         os.makedirs(path.parent, exist_ok=True)
 
         with open(path, "wb") as file:

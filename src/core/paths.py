@@ -1,5 +1,13 @@
 from pathlib import Path
 
+
+def get_root_dir() -> Path:
+    directory = Path().absolute()
+    while not directory.joinpath("pyproject.toml").exists():
+        directory = directory.parents[0]
+    return directory
+
+
 DATA_DIR: Path = Path(r"D:\data")
 RAW_DATA_DIR: Path = DATA_DIR / "raw"
 TRANSFORMED_DATA_DIR: Path = DATA_DIR / "transformed"
