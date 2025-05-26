@@ -27,6 +27,7 @@ def compute_metrics(booster: Booster, dataset: MLDataset, target_currencies: Lis
     statistics: List[Dict[str, Any]] = []
 
     for currency in target_currencies:
+        logging.info("Computing metrics for %s", currency.name)
         mask = dataset.data[COL_CURRENCY_INDEX] == currency.value
         y_pred: np.ndarray = booster.predict(dataset.data[mask], num_iteration=booster.best_iteration)
         y_true: np.ndarray = dataset.label[mask]

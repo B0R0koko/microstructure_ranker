@@ -17,6 +17,7 @@ from ml_base.enums import DatasetType
 from ml_base.features import FeatureFilter
 from ml_base.sample import SampleParams, Sample, MLDataset
 from models.prediction.columns import COL_CURRENCY_INDEX, COL_OUTPUT
+from models.prediction.features.asset_hold_time import add_asset_hold_times
 from models.prediction.features.asset_return import add_returns
 from models.prediction.features.exchange_diff import add_exchange_diffs
 from models.prediction.features.flow_imbalance import add_flow_imbalances
@@ -121,6 +122,21 @@ class BuildDataset:
 
         return features_currency_specific
 
+    def read_extra(self, bounds: Bounds, currency: Currency) -> Dict[str, np.ndarray]:
+        """Read features that will be used for evaluation"""
+        ts_extra: Dict[str, np.ndarray] = {}
+
+        for window in SAMPLING_WINDOWS:
+            add_asset_hold_times(
+                ts_by_name=ts_extra,
+                bounds=bounds,
+                currency=currency,
+                exchange_set=self.exchange_set,
+                window=window,
+            )
+
+        return ts_extra
+
     def read_output(self, bounds: Bounds, currency: Currency) -> np.ndarray:
         """Reads output return in pips with forecast step"""
         logging.info("Reading output for %s", currency.name)
@@ -181,14 +197,16 @@ class BuildDataset:
         features_categorical: Dict[str, np.ndarray] = self.read_categorical_features(
             currency=currency, col_size=len(index)
         )
+        features_extra: Dict[str, np.ndarray] = self.read_extra(bounds=bounds, currency=currency)
         output: np.ndarray = self.read_output(bounds=bounds, currency=currency)
         # Merge all dictionaries together and create DataFrame from it
         regressors: Dict[str, np.ndarray] = features_currency_specific | features_common | features_categorical
-        features: Dict[str, np.ndarray] = regressors | {COL_OUTPUT: output}
+        features: Dict[str, np.ndarray] = regressors | features_extra | {COL_OUTPUT: output}
         # Create FeatureSet
         feature_set: FeatureSet = FeatureSet(
             regressors=list(regressors.keys()),
             categorical=list(features_categorical.keys()),
+            eval_fields=list(features_extra.keys()),
             target=COL_OUTPUT,
         )
         df: pd.DataFrame = pd.DataFrame(features)

@@ -5,7 +5,6 @@ from datetime import timedelta, date
 from typing import List, Dict, Any
 
 import lightgbm as lgb
-import pandas as pd
 from lightgbm import Booster, early_stopping
 from scrapy.utils.log import configure_logging
 from tqdm import tqdm
@@ -14,9 +13,10 @@ from core.currency import Currency, get_target_currencies
 from core.exchange import Exchange
 from core.time_utils import Bounds
 from ml_base.enums import DatasetType
-from ml_base.features import FeatureFilter, save_feature_importances_to_file, get_importance_file_path
-from ml_base.metrics import compute_metrics, log_lgbm_iteration_to_stdout
+from ml_base.features import FeatureFilter, save_feature_importances_to_file
+from ml_base.metrics import log_lgbm_iteration_to_stdout
 from ml_base.sample import MLDataset, SampleParams, Sample
+from ml_base.utils import save_model, get_booster_path
 from models.prediction.build_sample import BuildDataset
 
 _BASE_PARAMS: Dict[str, Any] = {
@@ -99,7 +99,7 @@ class PrimaryPricePrediction:
 
         return booster
 
-    def build_model_pipeline(self, bounds: Bounds, sample_params: SampleParams) -> Booster:
+    def build_model_pipeline(self, bounds: Bounds, sample_params: SampleParams, day: date) -> Booster:
         """
         Once we ran feature_selection pipeline and narrowed down on the set of features, run this pipeline.
         """
@@ -108,25 +108,27 @@ class PrimaryPricePrediction:
         builder: BuildDataset = self.get_dataset_builder()
         sample: Sample = builder.create_sample(bounds=bounds, sample_params=sample_params)
         booster: Booster = self.train_model_sample(sample=sample)
-
-        df_metrics: pd.DataFrame = compute_metrics(
+        # Save trained model to file
+        save_model(
             booster=booster,
-            dataset=sample.get_dataset(ds_type=DatasetType.TEST),
-            target_currencies=self.target_currencies
+            out_file=get_booster_path(
+                day=day,
+                target_exchange=self.target_exchange,
+                forecast_step=self.forecast_steps,
+            ),
+            num_iteration=booster.best_iteration
         )
 
-        logging.info("TEST metrics\n%s", df_metrics)
         return booster
 
-    def feature_selection_pipeline(
-            self, bounds: Bounds, load_interval: timedelta, day: date
-    ) -> None:
+    def feature_selection_pipeline(self, bounds: Bounds, load_interval: timedelta, day: date) -> None:
         """Trains the model and writes feature_importances to local filesystem"""
         booster: Booster = self.fit_model_partially(bounds=bounds, load_interval=load_interval)
         save_feature_importances_to_file(
             booster=booster,
             day=day,
-            target_exchange=self.target_exchange
+            target_exchange=self.target_exchange,
+            forecast_step=self.forecast_steps,
         )
 
 
@@ -136,9 +138,7 @@ def main():
     bounds: Bounds = Bounds.for_days(
         date(2025, 4, 1), date(2025, 5, 25)
     )
-    feature_filter: FeatureFilter = FeatureFilter.from_importance(
-        file=get_importance_file_path(day=date(2025, 5, 25), target_exchange=Exchange.BINANCE_SPOT)
-    )
+    feature_filter: FeatureFilter = FeatureFilter.all()
 
     pipe = PrimaryPricePrediction(
         target_exchange=Exchange.BINANCE_SPOT,
@@ -147,15 +147,10 @@ def main():
         forecast_steps=timedelta(seconds=15),
     )
 
-    # pipe.feature_selection_pipeline(
-    #     bounds=bounds,
-    #     load_interval=timedelta(days=3),
-    #     day=date(2025, 5, 25)
-    # )
-
     pipe.build_model_pipeline(
         bounds=bounds,
         sample_params=SampleParams(train_share=0.6, validation_share=0.15, test_share=0.25),
+        day=date(2025, 5, 25)
     )
 
 

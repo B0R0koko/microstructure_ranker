@@ -33,6 +33,7 @@ class ExchangeSet:
     def for_exchange(cls, target_exchange: Exchange) -> "ExchangeSet":
         feature_exchanges: Dict[Exchange, List[Exchange]] = {
             Exchange.BINANCE_SPOT: [Exchange.BINANCE_USDM, Exchange.OKX_SPOT],
+            Exchange.BINANCE_USDM: [Exchange.BINANCE_SPOT, Exchange.OKX_SPOT],
             Exchange.OKX_SPOT: [Exchange.BINANCE_SPOT, Exchange.BINANCE_USDM],
         }
         assert target_exchange in feature_exchanges
