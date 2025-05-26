@@ -15,7 +15,7 @@ from core.utils import configure_logging
 from feature_writer.HFT.binance import SAMPLING_WINDOWS
 from ml_base.enums import DatasetType
 from ml_base.features import FeatureFilter
-from ml_base.sample import SampleParams, Sample, concat_samples, MLDataset
+from ml_base.sample import SampleParams, Sample, MLDataset
 from models.prediction.columns import COL_CURRENCY_INDEX, COL_OUTPUT
 from models.prediction.features.asset_return import add_returns
 from models.prediction.features.exchange_diff import add_exchange_diffs
@@ -174,6 +174,7 @@ class BuildDataset:
             "\n------------------------------------\nReading data for %s\n------------------------------------",
             currency.name,
         )
+        time: np.ndarray = read_index(bounds=bounds)
         features_currency_specific: Dict[str, np.ndarray] = self.read_currency_specific_features(
             bounds=bounds, currency=currency
         )
@@ -188,10 +189,14 @@ class BuildDataset:
         feature_set: FeatureSet = FeatureSet(
             regressors=list(regressors.keys()),
             categorical=list(features_categorical.keys()),
-            target=COL_OUTPUT
+            target=COL_OUTPUT,
         )
         df: pd.DataFrame = pd.DataFrame(features)
+        df = df.set_index(time)
+
         df = df.dropna(axis=0, subset=[COL_OUTPUT])  # remove observations with missing targets
+        # Remove observations that have all data missing
+        df = df.dropna(axis=0, subset=feature_set.regressors, how="all")
 
         return df, feature_set
 
@@ -203,7 +208,7 @@ class BuildDataset:
         # Read BTC/ETH features as sort of like to capture overall market movements
         features_common: Dict[str, np.ndarray] = self.read_common_features(bounds=bounds)
         date_index: np.ndarray = read_index(bounds=bounds)
-        samples: List[Sample] = []
+        sample: Sample = Sample.empty()
 
         for currency in self.target_currencies:
 
@@ -217,13 +222,16 @@ class BuildDataset:
             sample_currency: Optional[Sample] = self.split_and_wrap_into_samples(
                 df=df_currency, feature_set=feature_set, sample_params=sample_params, currency=currency
             )
+
             if sample_currency is None:
                 logging.info("Skipping currency %s because sample is empty", currency.name)
                 continue
 
-            samples.append(sample_currency)
+            sample.add_sample(sample_currency)
 
-        return concat_samples(samples=samples, require_lgb=True)
+        sample.construct()  # create lgb.Datasets for merged MLDatasets
+
+        return sample
 
     def create_dataset(self, bounds: Bounds, ds_type: DatasetType) -> MLDataset:
         """Collect data for each currency and combine all of it into a single MLDataset of DatasetType"""
@@ -277,7 +285,12 @@ def run_test():
         feature_filter=FeatureFilter(),
         forecast_step=timedelta(seconds=5),
     )
-    build.create_dataset(bounds=bounds, ds_type=DatasetType.TRAIN)
+    build.create_sample(
+        bounds=bounds,
+        sample_params=SampleParams(
+            train_share=0.7, validation_share=0.2, test_share=0.1
+        )
+    )
 
 
 if __name__ == "__main__":

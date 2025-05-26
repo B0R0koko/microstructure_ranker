@@ -23,7 +23,7 @@ def save_feature_importances_to_file(booster: Booster, day: date, target_exchang
     """Save booster feature importances to file located at get_importance_file_path() location"""
     df: pd.DataFrame = pd.DataFrame({
         "feature": booster.feature_name(),
-        "importance": booster.feature_importance(importance_type="gain")
+        "importance": booster.feature_importance(importance_type="gain", iteration=booster.best_iteration)
     })
     df.sort_values("importance", ascending=False, inplace=True)
     df.to_csv(get_importance_file_path(day=day, target_exchange=target_exchange), index=False)

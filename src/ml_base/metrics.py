@@ -1,13 +1,26 @@
+import logging
 from typing import List, Dict, Any
 
 import numpy as np
 import pandas as pd
 from lightgbm import Booster
+from lightgbm.callback import CallbackEnv
 from sklearn.metrics import r2_score, mean_absolute_error, f1_score, accuracy_score
 
 from core.currency import Currency
 from ml_base.sample import MLDataset
 from models.prediction.columns import COL_CURRENCY_INDEX
+
+
+def log_lgbm_iteration_to_stdout(env: CallbackEnv) -> None:
+    """LightGBM callback to log metrics from eval_sets with eval_names to mlflow"""
+    for _, metric_name, value, _ in env.evaluation_result_list:  # type:ignore
+        logging.info(
+            "Training model at iteration #%s %s = %s",
+            env.iteration,
+            metric_name,
+            value
+        )
 
 
 def compute_metrics(booster: Booster, dataset: MLDataset, target_currencies: List[Currency]) -> pd.DataFrame:
