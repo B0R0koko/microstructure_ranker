@@ -10,7 +10,7 @@ from core.currency_pair import CurrencyPair
 from core.paths import BINANCE_SPOT_RAW_TRADES
 from core.time_utils import Bounds
 from core.utils import configure_logging
-from preprocessing.pipelines.binance_trades_to_hive import BinanceSpotTrades2Hive
+from preprocessing.pipelines.binance_spot_trades_to_hive import BinanceSpotTrades2Hive
 
 
 def test_binance_spot_trades_to_hive() -> None:

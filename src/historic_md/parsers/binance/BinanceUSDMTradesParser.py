@@ -4,15 +4,15 @@ from typing import List
 
 from scrapy.crawler import CrawlerProcess
 
-from core.currency import Currency
+from core.currency import get_target_currencies
 from core.currency_pair import CurrencyPair
 from core.paths import BINANCE_USDM_RAW_TRADES
 from core.time_utils import Bounds
-from historic_md.parsers.binance.BinanceSpotTradesParser import BinanceSpotTradesParser
+from historic_md.parsers.binance.BinanceParser import BinanceBaseParser
 from historic_md.parsers.settings import SETTINGS
 
 
-class BinanceUSDMTradesParser(BinanceSpotTradesParser):
+class BinanceUSDMTradesParser(BinanceBaseParser):
     name: str = "binance_usdm_trades_parser"
 
     def __init__(
@@ -33,13 +33,13 @@ class BinanceUSDMTradesParser(BinanceSpotTradesParser):
 
 def main():
     bounds: Bounds = Bounds.for_days(
-        start_inclusive=date(2025, 5, 1),
+        start_inclusive=date(2025, 4, 1),
         end_exclusive=date(2025, 5, 25)
     )
     process: CrawlerProcess = CrawlerProcess(settings=SETTINGS)
     # Only collect data for USDT paired currency_pairs
     currency_pairs: List[CurrencyPair] = [
-        CurrencyPair(base=currency.name, term="USDT") for currency in (Currency.BTC,)
+        CurrencyPair(base=currency.name, term="USDT") for currency in get_target_currencies()
     ]
 
     process.crawl(

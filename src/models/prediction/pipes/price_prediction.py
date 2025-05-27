@@ -121,9 +121,14 @@ class PrimaryPricePrediction:
 
         return booster
 
-    def feature_selection_pipeline(self, bounds: Bounds, load_interval: timedelta, day: date) -> None:
+    def feature_selection_pipeline(self, bounds: Bounds, sample_params: SampleParams, day: date) -> None:
         """Trains the model and writes feature_importances to local filesystem"""
-        booster: Booster = self.fit_model_partially(bounds=bounds, load_interval=load_interval)
+        logging.info("Running <feature_selection_pipeline>")
+
+        builder: BuildDataset = self.get_dataset_builder()
+        sample: Sample = builder.create_sample(bounds=bounds, sample_params=sample_params)
+        booster: Booster = self.train_model_sample(sample=sample)
+
         save_feature_importances_to_file(
             booster=booster,
             day=day,

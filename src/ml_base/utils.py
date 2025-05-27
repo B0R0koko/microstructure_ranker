@@ -15,7 +15,7 @@ def get_booster_path(day: date, target_exchange: Exchange, forecast_step: timede
     """Returns path for a trained model"""
     return (
             get_root_dir() /
-            "src/models/prediction/boosters" /
+            "src/models/prediction/artifacts/boosters" /
             target_exchange.name /
             f"{target_exchange.name}-{get_seconds_slug(td=forecast_step)}@{format_date(day=day)}.txt"
     )
@@ -24,6 +24,6 @@ def get_booster_path(day: date, target_exchange: Exchange, forecast_step: timede
 def save_model(booster: Booster, out_file: Path, num_iteration: Optional[int] = None) -> None:
     """Save model to .txt file"""
     logging.info("Saving model to %s", out_file)
-    out_file.parent.mkdir(exist_ok=True)
+    os.makedirs(out_file.parent, exist_ok=True)
     booster.save_model(out_file, num_iteration=num_iteration)
     logging.info("Saving model of size %s KB to %s", round(os.path.getsize(out_file) / 1024, 3), out_file)

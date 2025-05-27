@@ -8,11 +8,11 @@ from core.currency import Currency, get_target_currencies
 from core.currency_pair import CurrencyPair
 from core.paths import BINANCE_USDM_RAW_L1
 from core.time_utils import Bounds
-from historic_md.parsers.binance.BinanceSpotTradesParser import BinanceSpotTradesParser
+from historic_md.parsers.binance.BinanceParser import BinanceBaseParser
 from historic_md.parsers.settings import SETTINGS
 
 
-class BinanceUSDML1Parser(BinanceSpotTradesParser):
+class BinanceUSDML1Parser(BinanceBaseParser):
     name: str = "binance_usdm_l1_parser"
 
     def __init__(
@@ -27,8 +27,7 @@ class BinanceUSDML1Parser(BinanceSpotTradesParser):
             output_dir=output_dir
         )
 
-    @staticmethod
-    def get_prefix(currency_pair: CurrencyPair) -> str:
+    def get_prefix(self, currency_pair: CurrencyPair) -> str:
         return f"data/futures/um/daily/bookTicker/{currency_pair.binance_name}/"
 
 

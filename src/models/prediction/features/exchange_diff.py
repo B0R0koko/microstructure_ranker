@@ -1,8 +1,9 @@
-from datetime import timedelta
+from datetime import timedelta, date
 from pathlib import Path
 from typing import Dict
 
 import numpy as np
+import pandas as pd
 
 from core.currency import Currency
 from core.currency_pair import CurrencyPair
@@ -84,3 +85,20 @@ def add_exchange_diffs(
                 currency_pair=CurrencyPair(base=currency.name, term=Currency.USDT.name),
                 window=window
             )
+
+def run_test() -> None:
+    """Check if the data is not identical on different exchanges"""
+    bounds: Bounds = Bounds.for_day(day=date(2025, 5, 1))
+    exchange_diff: np.ndarray = read_exchange_diff(
+        bounds=bounds,
+        target_exchange=Exchange.BINANCE_SPOT,
+        other_exchange=Exchange.BINANCE_USDM,
+        currency_pair=CurrencyPair.from_string("BTC-USDT"),
+        window=timedelta(seconds=5),
+    )
+    print(pd.Series(exchange_diff).describe())
+
+
+if __name__ == "__main__":
+    run_test()
+

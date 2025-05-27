@@ -1,4 +1,5 @@
 import logging
+import os
 from datetime import date, timedelta
 from pathlib import Path
 from typing import List, Optional
@@ -15,7 +16,7 @@ def get_importance_file_path(day: date, target_exchange: Exchange, forecast_step
     """Returns path for a given importance file"""
     return (
             get_root_dir() /
-            "src/models/prediction/feature_importances" /
+            "src/models/prediction/artifacts/feature_importances" /
             target_exchange.name /
             f"{target_exchange.name}-importances-{get_seconds_slug(td=forecast_step)}@{format_date(day)}.csv"
     )
@@ -28,11 +29,16 @@ def save_feature_importances_to_file(
         forecast_step: timedelta,
 ) -> None:
     """Save booster feature importances to file located at get_importance_file_path() location"""
+    path: Path = get_importance_file_path(day=day, target_exchange=target_exchange, forecast_step=forecast_step)
+    logging.info(f"Saving feature importances for %s@%s to %s", target_exchange.name, day, path)
+
     df: pd.DataFrame = pd.DataFrame({
         "feature": booster.feature_name(),
         "importance": booster.feature_importance(importance_type="gain", iteration=booster.best_iteration)
     })
     df.sort_values("importance", ascending=False, inplace=True)
+    os.makedirs(path.parent, exist_ok=True)
+
     df.to_csv(
         get_importance_file_path(day=day, target_exchange=target_exchange, forecast_step=forecast_step),
         index=False

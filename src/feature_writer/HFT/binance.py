@@ -36,8 +36,10 @@ SAMPLING_WINDOWS: List[timedelta] = [
 class SampledFeatureWriter:
 
     def __init__(self, bounds: Bounds, exchange: Exchange):
+        hive_location: Path = exchange.get_hive_location()
         logging.info("FeatureWriter started for %s", exchange.name)
-        self._hive = pl.scan_parquet(exchange.get_hive_location(), hive_partitioning=True)
+        logging.info("Scanning Hive location %s", hive_location)
+        self._hive = pl.scan_parquet(hive_location, hive_partitioning=True)
 
         self.bounds: Bounds = bounds
         self.exchange: Exchange = exchange
@@ -227,7 +229,7 @@ def run_main():
     # Run SampledFeatureWriter from here
     # set PYTHONPATH to src folder and run from terminal such that Process progress bar is displayed correctly
     bounds: Bounds = Bounds.for_days(
-        date(2025, 4, 1), date(2025, 5, 1)
+        date(2025, 4, 1), date(2025, 5, 25)
     )
     writer = SampledFeatureWriter(bounds=bounds, exchange=Exchange.BINANCE_USDM)
     currency_pairs: List[CurrencyPair] = [

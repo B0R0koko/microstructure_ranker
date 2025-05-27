@@ -5,7 +5,7 @@ from functools import partial
 from multiprocessing import Pool
 from multiprocessing.pool import AsyncResult
 from pathlib import Path
-from typing import List, Tuple, Optional
+from typing import List, Tuple
 
 import pandas as pd
 from tqdm import tqdm
@@ -34,13 +34,17 @@ def filter_by_bounds(bounds: Bounds, file_names: List[str]) -> List[date]:
 
 class BinanceSpotTrades2Hive:
 
-    def __init__(self, bounds: Bounds, output_dir: Optional[Path] = None):
+    def __init__(
+            self, bounds: Bounds,
+            raw_data_dir: Path,
+            output_dir: Path,
+    ):
         self.bounds: Bounds = bounds
-        self.raw_data_dir: Path = BINANCE_SPOT_RAW_TRADES
-        self.output_dir: Path = output_dir if output_dir is not None else BINANCE_SPOT_HIVE_TRADES
+        self.raw_data_dir: Path = raw_data_dir
+        self.output_dir: Path = output_dir
 
-    @staticmethod
-    def preprocess_batched_data(df_batch: pd.DataFrame, currency_pair: CurrencyPair, day: date) -> pd.DataFrame:
+
+    def preprocess_batched_data(self, df_batch: pd.DataFrame, currency_pair: CurrencyPair, day: date) -> pd.DataFrame:
         """Attach new columns and convert dtypes here before saving to hive structure"""
         # Since 2025-01-01 Binance Spot data is written not in "ms" but in "us" - microseconds
         unit: str = "ms" if day < date(2025, 1, 1) else "us"
@@ -106,7 +110,11 @@ def run_main():
     bounds: Bounds = Bounds.for_days(
         date(2025, 5, 1), date(2025, 5, 24)
     )
-    pipe = BinanceSpotTrades2Hive(bounds=bounds)
+    pipe = BinanceSpotTrades2Hive(
+        bounds=bounds,
+        raw_data_dir=BINANCE_SPOT_RAW_TRADES,
+        output_dir=BINANCE_SPOT_HIVE_TRADES
+    )
     pipe.run_multiprocessing()
 
 
