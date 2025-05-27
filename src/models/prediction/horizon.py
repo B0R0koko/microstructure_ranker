@@ -210,7 +210,7 @@ def main():
         date(2025, 5, 10), date(2025, 5, 25)
     )
 
-    target_exchange: Exchange = Exchange.BINANCE_USDM
+    target_exchange: Exchange = Exchange.OKX_SPOT
     ref_day: date = date(2025, 5, 25)
 
     train_multiple_models_with_different_horizons(
