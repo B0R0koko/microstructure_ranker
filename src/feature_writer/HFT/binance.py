@@ -16,7 +16,7 @@ from core.currency_pair import CurrencyPair
 from core.data_type import Feature, SamplingType
 from core.exchange import Exchange
 from core.time_utils import Bounds
-from feature_writer.feature_exprs import *
+from feature_writer.HFT.feature_exprs import *
 from feature_writer.utils import write_feature, aggregate_into_trades
 from models.prediction.features.utils import statistic_name
 
@@ -174,7 +174,7 @@ class SampledFeatureWriter:
                 df_index
                 .join(sampled_features, left_on=SAMPLED_TIME, right_on=TRADE_TIME, how="left")
                 .with_columns(
-                    # Post process some features
+                    # Post-process some features
                     # 1. fill missing values in asset_return with 0
                     asset_return=pl.col("asset_return").fill_null(0),
                     asset_return_adj=compute_return_adj(window=window)
@@ -198,7 +198,7 @@ class SampledFeatureWriter:
 
     def run_in_multiprocessing_pool(self, currency_pairs: List[CurrencyPair], cpu_count: int = 10) -> None:
         """Run daily feature writer using all cpu cores, susceptible to RAM limit"""
-        # We want to parallelize over (CurrencyPair, day) to avoid cases when all workers are finished
+        # We want to parallelize over (CurrencyPair, day) to avoid cases when all workers are finished,
         # and there is only one currency pair left that is run in the single process
         freeze_support()  # for Windows support
         tqdm.set_lock(RLock())  # for managing output contention
@@ -226,7 +226,7 @@ class SampledFeatureWriter:
 
 
 def run_main():
-    # Run SampledFeatureWriter from here
+    # Run SampledFeatureWriter from here,
     # set PYTHONPATH to src folder and run from terminal such that Process progress bar is displayed correctly
     bounds: Bounds = Bounds.for_days(
         date(2025, 4, 1), date(2025, 5, 25)

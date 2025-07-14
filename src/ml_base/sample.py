@@ -97,9 +97,7 @@ class Sample:
 
     def describe(self) -> None:
         for ds_type, dataset in self.datasets.items():
-            nan_stats: pd.Series = dataset.data.isna().sum().sort_values(ascending=False)
             logging.info("Shape for %s@%s %s\n", self.name, ds_type.name, dataset.data.shape)
-            logging.info("Nancount for %s@%s\n\n%s\n", self.name, ds_type.name, nan_stats)
 
     def get_dataset(self, ds_type: DatasetType) -> MLDataset:
         assert ds_type in self.dataset_types, f"{ds_type} not in {self.dataset_types}"

@@ -16,11 +16,12 @@ from historic_md.parsers.settings import SETTINGS
 class BinanceSpotTradesParser(BinanceBaseParser):
     name = "binance_spot_trades_parser"
 
-    def __init__(self, bounds: Bounds, currency_pairs: List[CurrencyPair], output_dir: Path, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.bounds: Bounds = bounds
-        self.currency_pairs: List[CurrencyPair] = currency_pairs
-        self.output_dir: Path = output_dir
+    def __init__(self, bounds: Bounds, currency_pairs: List[CurrencyPair], output_dir: Path):
+        super().__init__(
+            bounds=bounds,
+            currency_pairs=currency_pairs,
+            output_dir=output_dir
+        )
 
     def get_prefix(self, currency_pair: CurrencyPair) -> str:
         return f"data/spot/daily/trades/{currency_pair.binance_name}/"
@@ -29,13 +30,13 @@ class BinanceSpotTradesParser(BinanceBaseParser):
 def run_main():
     configure_logging()
     bounds: Bounds = Bounds.for_days(
-        date(2025, 1, 1),
-        date(2025, 5, 24)
+        date(2023, 1, 1),
+        date(2025, 7, 14)
     )
     process: CrawlerProcess = CrawlerProcess(settings=SETTINGS)
 
     usdt_currencies: List[CurrencyPair] = [
-        currency_pair for currency_pair in collect_all_spot_currency_pairs() if currency_pair.term == "USDT"
+        currency_pair for currency_pair in collect_all_spot_currency_pairs() if currency_pair.term == "BTC"
     ]
 
     logging.info("Collecting data for %s currencies", len(usdt_currencies))

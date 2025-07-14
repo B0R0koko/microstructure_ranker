@@ -5,7 +5,7 @@ from functools import partial
 from multiprocessing import Pool
 from multiprocessing.pool import AsyncResult
 from pathlib import Path
-from typing import List, Tuple
+from typing import List, Any, Generator
 
 import pandas as pd
 from tqdm import tqdm
@@ -43,7 +43,6 @@ class BinanceSpotTrades2Hive:
         self.raw_data_dir: Path = raw_data_dir
         self.output_dir: Path = output_dir
 
-
     def preprocess_batched_data(self, df_batch: pd.DataFrame, currency_pair: CurrencyPair, day: date) -> pd.DataFrame:
         """Attach new columns and convert dtypes here before saving to hive structure"""
         # Since 2025-01-01 Binance Spot data is written not in "ms" but in "us" - microseconds
@@ -78,7 +77,7 @@ class BinanceSpotTrades2Hive:
             df_batch = self.preprocess_batched_data(df_batch=df_batch, currency_pair=currency_pair, day=day)
             self.save_batched_data_to_hive(df_batch=df_batch)
 
-    def iterate_over_tasks(self) -> Tuple[date, CurrencyPair]:
+    def iterate_over_tasks(self) -> Generator[tuple[date, CurrencyPair], Any, None]:
         for symbol in os.listdir(self.raw_data_dir):
             filtered_dates: List[date] = filter_by_bounds(
                 bounds=self.bounds, file_names=os.listdir(self.raw_data_dir / symbol)

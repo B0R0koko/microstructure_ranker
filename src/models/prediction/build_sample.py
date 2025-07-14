@@ -14,7 +14,7 @@ from core.time_utils import Bounds
 from core.utils import configure_logging
 from feature_writer.HFT.binance import SAMPLING_WINDOWS
 from ml_base.enums import DatasetType
-from ml_base.features import FeatureFilter
+from ml_base.features import FeatureFilter, get_importance_file_path
 from ml_base.sample import SampleParams, Sample, MLDataset
 from models.prediction.columns import COL_CURRENCY_INDEX, COL_OUTPUT
 from models.prediction.features.asset_hold_time import add_asset_hold_times
@@ -295,20 +295,29 @@ class BuildDataset:
 def run_test():
     configure_logging()
     bounds: Bounds = Bounds.for_days(
-        date(2025, 5, 1), date(2025, 5, 5)
+        date(2025, 4, 1), date(2025, 5, 15)
     )
+    target_exchange: Exchange = Exchange.BINANCE_SPOT
+    ref_day: date = date(2025, 5, 25)
+    forecast_step: timedelta = timedelta(seconds=1)
+
     build = BuildDataset(
         target_exchange=Exchange.BINANCE_SPOT,
         target_currencies=get_target_currencies(),
-        feature_filter=FeatureFilter(),
+        feature_filter=FeatureFilter.from_importance(
+            file=get_importance_file_path(
+                day=ref_day, target_exchange=target_exchange, forecast_step=forecast_step
+            )
+        ),
         forecast_step=timedelta(seconds=5),
     )
-    build.create_sample(
+    sample: Sample = build.create_sample(
         bounds=bounds,
         sample_params=SampleParams(
             train_share=0.7, validation_share=0.2, test_share=0.1
         )
     )
+    sample.describe()
 
 
 if __name__ == "__main__":

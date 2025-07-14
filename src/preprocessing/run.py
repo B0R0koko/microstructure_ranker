@@ -13,13 +13,13 @@ def run_main():
     """Check if the data uploaded to HIVE is correct"""
     configure_logging()
     bounds: Bounds = Bounds.for_days(
-        date(2025, 5, 1), date(2025, 5, 5)
+        date(2025, 5, 1), date(2025, 5, 15)
     )
     logging.info("Collecting data for %s", str(bounds))
     df: pl.DataFrame = (
-        pl.scan_parquet(Exchange.OKX_SPOT.get_hive_location(), hive_partitioning=True)
+        pl.scan_parquet(Exchange.BINANCE_SPOT.get_hive_location(), hive_partitioning=True)
         .filter(
-            (pl.col("symbol") == "ADA-USDT") &
+            (pl.col("symbol") == "BTC-USDT") &
             (pl.col("date").is_between(bounds.day0, bounds.day1)) &
             (pl.col(TRADE_TIME).is_between(bounds.start_inclusive, bounds.end_exclusive))
         )

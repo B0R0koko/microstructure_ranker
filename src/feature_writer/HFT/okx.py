@@ -24,7 +24,7 @@ class OKXFeatureWriter(SampledFeatureWriter):
 
 
 def run_main():
-    # Run OKXFeatureWriter from here
+    # Run OKXFeatureWriter from here,
     # set PYTHONPATH to src folder and run from terminal such that Process progress bar is displayed correctly
     bounds: Bounds = Bounds.for_days(
         date(2025, 4, 1), date(2025, 5, 1)
