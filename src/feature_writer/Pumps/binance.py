@@ -1,9 +1,9 @@
 import logging
 import os
-from datetime import timedelta
+from datetime import timedelta, datetime
 from enum import Enum
 from pathlib import Path
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any
 
 import polars as pl
 from tqdm import tqdm
@@ -14,8 +14,9 @@ from core.exchange import Exchange
 from core.paths import FEATURE_DIR, get_root_dir
 from core.time_utils import Bounds
 from core.utils import configure_logging
-from feature_writer.HFT.feature_exprs import compute_return, compute_sigma, compute_share_of_long_trades, \
-    compute_powerlaw_alpha, compute_slippage_imbalance, compute_flow_imbalance
+from feature_writer.HFT.feature_exprs import compute_return, compute_share_of_long_trades, \
+    compute_powerlaw_alpha, compute_slippage_imbalance, compute_flow_imbalance, compute_asset_return_zscore, \
+    compute_quote_abs_zscore, compute_num_trades
 from feature_writer.Pumps.enums import PumpEvent
 from feature_writer.Pumps.utils import load_pumps
 from feature_writer.utils import aggregate_into_trades
@@ -24,6 +25,8 @@ from feature_writer.utils import aggregate_into_trades
 class NamedTimeDelta(Enum):
     ONE_MINUTE = (timedelta(minutes=1), "1MIN")
     TWO_MINUTES = (timedelta(minutes=2), "2MIN")
+    THREE_MINUTES = (timedelta(minutes=3), "3MIN")
+    FOUR_MINUTES = (timedelta(minutes=4), "4MIN")
     FIVE_MINUTES = (timedelta(minutes=5), "5MIN")
     FIFTEEN_MINUTES = (timedelta(minutes=15), "15MIN")
     ONE_HOUR = (timedelta(hours=1), "1H")
@@ -33,7 +36,7 @@ class NamedTimeDelta(Enum):
     ONE_DAY = (timedelta(days=1), "1D")
     TWO_DAYS = (timedelta(days=2), "2D")
     ONE_WEEK = (timedelta(weeks=1), "7D")
-    TWO_WEEK = (timedelta(weeks=2), "14D")
+    TWO_WEEKS = (timedelta(weeks=2), "14D")
 
     def get_td(self) -> timedelta:
         return self.value[0]
@@ -112,40 +115,82 @@ class PumpsFeatureWriter:
         ]
 
     @staticmethod
-    def compute_features(df: pl.DataFrame, pump_event: PumpEvent) -> Dict[str, float]:
+    def compute_features(df: pl.DataFrame, pump_event: PumpEvent) -> Dict[str, Any]:
         features: Dict[str, float] = {}
         window: NamedTimeDelta
 
-        for window in list(NamedTimeDelta):
-            # Compute using data 1 hour prior to the pump
-            df_filtered = df.filter(
-                pl.col(TRADE_TIME).is_between(pump_event.time - window.get_td(), pump_event.time - timedelta(hours=1)),
+        df_hourly: pl.DataFrame = (
+            df.group_by_dynamic(
+                index_column=TRADE_TIME,
+                period=timedelta(hours=1),
+                every=timedelta(hours=1),
             )
+            .agg(
+                asset_return_pips=(pl.col("price_last").last() / pl.col("price_first").first() - 1) * 1e4,
+                quote_abs=pl.col("quote_abs").sum()
+            )
+        )
+        asset_return_std: float = df_hourly.select(pl.col("asset_return_pips").std()).item()
+        quote_abs_std: float = df_hourly.select(pl.col("quote_abs").std()).item()
+
+        rb: datetime = pump_event.time - timedelta(hours=1)
+
+        for window in (
+                NamedTimeDelta.ONE_MINUTE,
+                NamedTimeDelta.TWO_MINUTES,
+                NamedTimeDelta.FIVE_MINUTES,
+                NamedTimeDelta.FIFTEEN_MINUTES,
+                NamedTimeDelta.ONE_HOUR,
+                NamedTimeDelta.TWO_HOURS,
+                NamedTimeDelta.FOUR_HOURS,
+                NamedTimeDelta.TWELVE_HOURS,
+                NamedTimeDelta.ONE_DAY,
+                NamedTimeDelta.TWO_DAYS,
+                NamedTimeDelta.ONE_WEEK,
+                NamedTimeDelta.TWO_WEEKS
+        ):
+            # Compute using data 1 hour prior to the pump
+            df_filtered: pl.DataFrame = df.filter(pl.col(TRADE_TIME).is_between(rb - window.get_td(), rb))
+            df_hourly_filtered: pl.DataFrame = df_hourly.filter(pl.col(TRADE_TIME).is_between(rb - window.get_td(), rb))
+
             values: Dict[str, float] = {
                 f"asset_return@{window.get_slug()}": df_filtered.select(compute_return()).item(),
-                f"sigma@{window.get_slug()}": df_filtered.select(compute_sigma()).item(),
+                f"asset_return_zscore@{window.get_slug()}": df_hourly_filtered.select(
+                    compute_asset_return_zscore(asset_return_std=asset_return_std)
+                ).item(),
+                f"quote_abs_zscore@{window.get_slug()}": df_hourly_filtered.select(
+                    compute_quote_abs_zscore(quote_abs_std=quote_abs_std)
+                ).item(),
                 f"share_of_long_trades@{window.get_slug()}": df_filtered.select(compute_share_of_long_trades()).item(),
                 f"powerlaw_alpha@{window.get_slug()}": df_filtered.select(compute_powerlaw_alpha()).item(),
                 f"slippage_imbalance@{window.get_slug()}": df_filtered.select(compute_slippage_imbalance()).item(),
                 f"flow_imbalance@{window.get_slug()}": df_filtered.select(compute_flow_imbalance()).item(),
+                f"num_trades@{window.get_slug()}": df_filtered.select(compute_num_trades()).item(),
             }
             features |= values
 
         # Price decay
-        features["target_return@1MIN"] = (
-            df.filter(
-                pl.col(TRADE_TIME).is_between(pump_event.time, pump_event.time + timedelta(minutes=1))
+        for decay_window in (
+                NamedTimeDelta.ONE_MINUTE,
+                NamedTimeDelta.TWO_MINUTES,
+                NamedTimeDelta.THREE_MINUTES,
+                NamedTimeDelta.FOUR_MINUTES,
+                NamedTimeDelta.FIVE_MINUTES,
+        ):
+            features[f"target_return@{decay_window.get_slug()}"] = (
+                df.filter(
+                    pl.col(TRADE_TIME).is_between(pump_event.time, pump_event.time + decay_window.get_td())
+                )
+                .select(compute_return()).item()
             )
-            .select(compute_return()).item()
-        )
 
         return features
 
     def create_cross_section(self, pump_event: PumpEvent) -> Optional[pl.DataFrame]:
         logging.info("Creating cross section")
         bounds: Bounds = Bounds(
-            start_inclusive=pump_event.time - timedelta(days=14),
-            end_exclusive=pump_event.time + timedelta(minutes=1),
+            start_inclusive=pump_event.time - timedelta(days=30),
+            end_exclusive=pump_event.time + timedelta(hours=1),
         )
         currency_pairs: List[CurrencyPair] = self.get_currency_pairs(bounds=bounds)
 
@@ -162,7 +207,9 @@ class PumpsFeatureWriter:
         for currency_pair in tqdm(currency_pairs):
             df: pl.DataFrame = self.load_data_for_currency_pair(bounds=bounds, currency_pair=currency_pair)
             df = self.preprocess_data_for_currency(df=df)
-            features: Dict[str, float] = self.compute_features(df=df, pump_event=pump_event)
+            features: Dict[str, Any] = self.compute_features(df=df, pump_event=pump_event)
+            features["currency_pair"] = currency_pair.name
+
             cross_section_features.append(features)
 
         return pl.DataFrame(data=cross_section_features)
@@ -170,12 +217,11 @@ class PumpsFeatureWriter:
     @staticmethod
     def write_cross_section(features: pl.DataFrame, pump_event: PumpEvent) -> None:
         path: Path = FEATURE_DIR / "pumps" / f"{str(pump_event)}.parquet"
-        os.makedirs(path, exist_ok=True)
+        os.makedirs(path.parent, exist_ok=True)
         logging.info("Writing cross section to %s", path)
         features.write_parquet(file=path)
 
     def run(self, pump_events: List[PumpEvent]) -> None:
-
         for pump_event in tqdm(pump_events):
             features: Optional[pl.DataFrame] = self.create_cross_section(pump_event=pump_event)
             if features is not None:
@@ -188,7 +234,7 @@ def main():
         path=get_root_dir() / "src/feature_writer/Pumps/resources/pumps.json"
     )
     writer = PumpsFeatureWriter()
-    writer.run(pump_events=pump_events)
+    writer.run(pump_events=pump_events[1:2])
 
 
 if __name__ == "__main__":

@@ -63,7 +63,7 @@ class BinanceBaseParser(ABC, scrapy.Spider):
         datavision_url: str = f"{BINANCE_S3}?{urlencode(params)}"
         return datavision_url
 
-    def start_requests(self) -> scrapy.Request:
+    def start_requests(self):
         """This method is run first when the Spider starts"""
         for currency_pair in self.currency_pairs:
             yield Request(

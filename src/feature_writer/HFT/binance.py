@@ -139,7 +139,6 @@ class SampledFeatureWriter:
             features: Dict[Feature, pl.Expr] = {
                 Feature.ASSET_RETURN: compute_return(),
                 Feature.ASSET_HOLD_TIME: compute_asset_hold_time(),
-                Feature.SIGMA: compute_sigma(),
                 Feature.SHARE_OF_LONG_TRADES: compute_flow_imbalance(),
                 Feature.POWERLAW_ALPHA: compute_slippage_imbalance(),
                 Feature.SLIPPAGE_IMBALANCE: compute_powerlaw_alpha(),

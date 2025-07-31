@@ -41,13 +41,21 @@ def compute_share_of_long_trades() -> pl.Expr:
     return (pl.col("is_long").sum() / pl.len()).alias("share_of_long_trades")
 
 
-def compute_sigma() -> pl.Expr:
-    return pl.col("price_last").std().alias("sigma")
+def compute_asset_return_zscore(asset_return_std: float) -> pl.Expr:
+    return pl.col("asset_return_pips").mean() / asset_return_std
+
+
+def compute_quote_abs_zscore(quote_abs_std: float) -> pl.Expr:
+    return pl.col("quote_abs").mean() / quote_abs_std
 
 
 def compute_return_adj(window: timedelta) -> pl.Expr:
     """return scaled by hold_time"""
     return pl.col("asset_return") * (window.total_seconds() / pl.col("asset_hold_time"))
+
+
+def compute_num_trades() -> pl.Expr:
+    return pl.len()
 
 
 def compute_close_price() -> pl.Expr:

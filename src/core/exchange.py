@@ -18,6 +18,10 @@ class Exchange(Enum):
         }
         return hives[self]
 
+    @staticmethod
+    def parse_from_lower(exchange_str: str) -> "Exchange":
+        return Exchange[exchange_str.upper()]
+
 
 class ExchangeSet:
 

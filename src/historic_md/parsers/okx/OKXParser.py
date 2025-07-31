@@ -27,7 +27,7 @@ class OKXTradeParser(scrapy.Spider):
         return f"https://www.okx.com/cdn/okex/traderecords/trades/monthly/{day.strftime("%Y%m")}/" \
                f"allspot-trades-{str(day)}.zip"
 
-    def start_requests(self) -> scrapy.Request:
+    def start_requests(self):
         for day in self.bounds.date_range():
             yield Request(
                 url=self.get_zip_file_url(day=day),
